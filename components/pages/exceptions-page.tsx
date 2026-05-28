@@ -5,6 +5,7 @@ import { CreateExceptionModal } from "@/components/exceptions/create-exception-m
 import { ExceptionDetailDrawer } from "@/components/exceptions/exception-detail-drawer";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SyncStatus } from "@/components/ui/sync-status";
 import { useExceptions } from "@/context/exceptions-context";
@@ -27,7 +28,7 @@ const filters: ExceptionFilter[] = [
 ];
 
 export function ExceptionsPage() {
-  const { exceptions } = useExceptions();
+  const { exceptions, loading, error, source, refresh } = useExceptions();
   const [severityFilter, setSeverityFilter] = useState<ExceptionFilter>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,18 +55,25 @@ export function ExceptionsPage() {
     return counts;
   }, [exceptions]);
 
+  const syncState = loading ? "syncing" : error && source === "mock" ? "error" : "live";
+
   return (
     <DashboardShell
       eyebrow="Exception management"
       title="Exceptions"
-      description={`${filtered.length} exceptions · click a card to view and edit`}
+      description={
+        loading
+          ? "Loading exceptions…"
+          : `${filtered.length} exceptions · click a card to view and edit`
+      }
       actions={
         <>
-          <SyncStatus state="live" />
+          <SyncStatus state={syncState} />
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
             className={btnPrimary}
+            disabled={loading}
           >
             New exception
           </button>
@@ -84,18 +92,33 @@ export function ExceptionsPage() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className={cardSurface}>
+          <LoadingState
+            title="Loading exceptions"
+            description="Fetching open and resolved exceptions from Supabase…"
+          />
+        </div>
+      ) : error && exceptions.length === 0 ? (
+        <div className={cardSurface}>
+          <ErrorState description={error} onRetry={() => void refresh()} />
+        </div>
+      ) : filtered.length === 0 ? (
         <div className={cardSurface}>
           <EmptyState
             title={
               severityFilter === "Resolved"
                 ? "No resolved exceptions"
-                : "No active exceptions at this severity"
+                : exceptions.length === 0
+                  ? "No exceptions yet"
+                  : "No active exceptions at this severity"
             }
             description={
               severityFilter === "Resolved"
                 ? "Resolved exceptions will appear here once issues are closed."
-                : "All clear for the selected filter. Try another severity level or view All."
+                : exceptions.length === 0
+                  ? "Create a new exception to start tracking shipment issues."
+                  : "All clear for the selected filter. Try another severity level or view All."
             }
           />
         </div>

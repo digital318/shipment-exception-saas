@@ -1,12 +1,14 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { SyncStatus } from "@/components/ui/sync-status";
 import { useExceptions } from "@/context/exceptions-context";
 import { activityTypeStyles, cardHeader, cardSurface } from "@/lib/styles";
 
 export function RecentActivityPanel() {
-  const { activity } = useExceptions();
+  const { activity, loading, error, source, refresh } = useExceptions();
+  const syncState = loading ? "syncing" : error && source === "mock" ? "error" : "live";
 
   return (
     <aside className={`${cardSurface} xl:sticky xl:top-[5.5rem] xl:self-start`}>
@@ -15,9 +17,16 @@ export function RecentActivityPanel() {
           <h2 className="text-sm font-semibold text-white">Recent Activity</h2>
           <p className="mt-1 text-xs text-zinc-500">Live exception timeline</p>
         </div>
-        <SyncStatus state="live" />
+        <SyncStatus state={syncState} />
       </div>
-      {activity.length === 0 ? (
+      {loading ? (
+        <LoadingState
+          title="Loading activity"
+          description="Fetching recent exception events…"
+        />
+      ) : error && activity.length === 0 ? (
+        <ErrorState description={error} onRetry={() => void refresh()} />
+      ) : activity.length === 0 ? (
         <EmptyState
           title="No recent activity"
           description="Exception events will appear here as they occur."

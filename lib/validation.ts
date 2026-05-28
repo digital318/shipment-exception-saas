@@ -1,12 +1,12 @@
 import { SHIPMENT_ID_PATTERN } from "./constants";
 import type { CreateExceptionInput } from "./types";
-import { shipmentRows } from "./mock-data";
 
 export type FieldErrors = Partial<Record<keyof CreateExceptionInput | "form", string>>;
 
 export function validateCreateException(
   input: CreateExceptionInput,
   existingShipmentIds: string[],
+  networkShipmentIds: string[],
 ): FieldErrors {
   const errors: FieldErrors = {};
   const shipmentId = input.shipmentId.trim().toUpperCase();
@@ -15,7 +15,7 @@ export function validateCreateException(
     errors.shipmentId = "Shipment ID is required.";
   } else if (!SHIPMENT_ID_PATTERN.test(shipmentId)) {
     errors.shipmentId = "Use format FP-2026-084219.";
-  } else if (!shipmentRows.some((s) => s.id === shipmentId)) {
+  } else if (!networkShipmentIds.some((s) => s === shipmentId)) {
     errors.shipmentId = "Shipment not found in network.";
   } else if (existingShipmentIds.includes(shipmentId)) {
     errors.shipmentId = "An exception already exists for this shipment.";

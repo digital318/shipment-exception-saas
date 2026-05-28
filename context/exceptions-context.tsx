@@ -4,30 +4,41 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { CURRENT_USER } from "@/lib/constants";
+import { fetchAppData } from "@/lib/data";
+import type { DataSource } from "@/lib/data/types";
 import {
   formatNowLabel,
   formatOpenedAt,
   generateExceptionId,
   generateNoteId,
 } from "@/lib/exception-utils";
-import { initialExceptionRecords, recentActivity, shipmentRows } from "@/lib/mock-data";
 import type {
   ActivityItem,
   CreateExceptionInput,
+  Customer,
   ExceptionRecord,
   InternalNote,
+  Shipment,
   UpdateExceptionInput,
 } from "@/lib/types";
 
 type ExceptionsContextValue = {
+  shipments: Shipment[];
+  customers: Customer[];
+  carriers: string[];
   exceptions: ExceptionRecord[];
   activity: ActivityItem[];
+  loading: boolean;
+  error: string | null;
+  source: DataSource;
   openCount: number;
+  refresh: () => Promise<void>;
   getById: (id: string) => ExceptionRecord | undefined;
   getByShipmentId: (shipmentId: string) => ExceptionRecord | undefined;
   createException: (input: CreateExceptionInput) => ExceptionRecord | null;
@@ -41,10 +52,42 @@ type ExceptionsContextValue = {
 const ExceptionsContext = createContext<ExceptionsContextValue | null>(null);
 
 export function ExceptionsProvider({ children }: { children: ReactNode }) {
-  const [exceptions, setExceptions] = useState<ExceptionRecord[]>(
-    initialExceptionRecords,
-  );
-  const [activity, setActivity] = useState<ActivityItem[]>(recentActivity);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [carriers, setCarriers] = useState<string[]>([]);
+  const [exceptions, setExceptions] = useState<ExceptionRecord[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<DataSource>("mock");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const snapshot = await fetchAppData();
+      setShipments(snapshot.shipments);
+      setCustomers(snapshot.customers);
+      setCarriers(snapshot.carriers);
+      setExceptions(snapshot.exceptions);
+      setActivity(snapshot.activity);
+      setSource(snapshot.source);
+      if (snapshot.error && snapshot.source === "mock") {
+        setError(snapshot.error);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load FreightPulse data.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const openCount = useMemo(
     () => exceptions.filter((e) => e.status !== "Resolved").length,
@@ -68,7 +111,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
 
   const createException = useCallback(
     (input: CreateExceptionInput): ExceptionRecord | null => {
-      const shipment = shipmentRows.find((s) => s.id === input.shipmentId);
+      const shipment = shipments.find((s) => s.id === input.shipmentId);
       if (!shipment) return null;
 
       const duplicate = exceptions.some((e) => e.shipmentId === input.shipmentId);
@@ -93,7 +136,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       setExceptions((prev) => [record, ...prev]);
       return record;
     },
-    [exceptions],
+    [exceptions, shipments],
   );
 
   const updateException = useCallback((id: string, patch: UpdateExceptionInput) => {
@@ -167,9 +210,16 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
+      shipments,
+      customers,
+      carriers,
       exceptions,
       activity,
+      loading,
+      error,
+      source,
       openCount,
+      refresh: loadData,
       getById,
       getByShipmentId,
       createException,
@@ -180,9 +230,16 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       resolveException,
     }),
     [
+      shipments,
+      customers,
+      carriers,
       exceptions,
       activity,
+      loading,
+      error,
+      source,
       openCount,
+      loadData,
       getById,
       getByShipmentId,
       createException,
@@ -205,4 +262,27 @@ export function useExceptions() {
   const ctx = useContext(ExceptionsContext);
   if (!ctx) throw new Error("useExceptions must be used within ExceptionsProvider");
   return ctx;
+}
+
+export function useShipments() {
+  const ctx = useExceptions();
+  return {
+    shipments: ctx.shipments,
+    carriers: ctx.carriers,
+    loading: ctx.loading,
+    error: ctx.error,
+    source: ctx.source,
+    refresh: ctx.refresh,
+  };
+}
+
+export function useCustomers() {
+  const ctx = useExceptions();
+  return {
+    customers: ctx.customers,
+    loading: ctx.loading,
+    error: ctx.error,
+    source: ctx.source,
+    refresh: ctx.refresh,
+  };
 }

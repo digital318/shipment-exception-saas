@@ -6,27 +6,52 @@ import {
   IconClock,
   IconTruck,
 } from "@/components/icons";
+import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { useExceptions } from "@/context/exceptions-context";
-import { shipmentRows } from "@/lib/mock-data";
 import { badgeBase, cardSurface } from "@/lib/styles";
 
 export function MetricsGrid() {
-  const { exceptions, openCount } = useExceptions();
+  const { exceptions, shipments, loading, error, openCount, refresh } = useExceptions();
+
+  if (loading) {
+    return (
+      <section aria-label="Key metrics">
+        <div className={`${cardSurface} overflow-hidden`}>
+          <LoadingState
+            title="Loading metrics"
+            description="Calculating shipment and exception KPIs…"
+          />
+        </div>
+      </section>
+    );
+  }
+
+  if (error && shipments.length === 0) {
+    return (
+      <section aria-label="Key metrics">
+        <div className={`${cardSurface} overflow-hidden`}>
+          <ErrorState description={error} onRetry={() => void refresh()} />
+        </div>
+      </section>
+    );
+  }
 
   const criticalCount = exceptions.filter(
     (e) => e.severity === "Critical" && e.status !== "Resolved",
   ).length;
-  const delayedCount = shipmentRows.filter((s) => s.status === "Delayed").length;
-  const onTimePct = (
-    (shipmentRows.filter((s) => s.delayHours === null).length / shipmentRows.length) *
-    100
-  ).toFixed(1);
+  const delayedCount = shipments.filter((s) => s.status === "Delayed").length;
+  const onTimeCount = shipments.filter((s) => s.delayHours === null).length;
+  const onTimePct =
+    shipments.length > 0
+      ? ((onTimeCount / shipments.length) * 100).toFixed(1)
+      : "0.0";
+  const activeShipments = shipments.filter((s) => s.status !== "Delivered").length;
 
   const metrics = [
     {
       label: "Active Shipments",
-      value: "1,284",
-      delta: "+38",
+      value: activeShipments.toLocaleString(),
+      delta: `${shipments.length} tracked`,
       hint: "in network today",
       trend: "up" as const,
       gradient: "from-violet-500/20 via-indigo-500/10 to-transparent",
@@ -36,7 +61,7 @@ export function MetricsGrid() {
     },
     {
       label: "Delayed Shipments",
-      value: String(delayedCount + 86),
+      value: String(delayedCount),
       delta: `${delayedCount} on this page`,
       hint: "require ETA revision",
       trend: "down" as const,

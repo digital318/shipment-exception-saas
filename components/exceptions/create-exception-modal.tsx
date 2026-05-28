@@ -5,7 +5,6 @@ import { IconX } from "@/components/icons";
 import { useExceptions } from "@/context/exceptions-context";
 import { useToast } from "@/context/toast-context";
 import { EXCEPTION_OWNERS, ISSUE_STATUSES, SEVERITIES } from "@/lib/constants";
-import { shipmentRows } from "@/lib/mock-data";
 import { btnPrimary, btnSecondary, inputBase, sectionLabel, selectBase } from "@/lib/styles";
 import type { CreateExceptionInput, IssueStatus, Severity } from "@/lib/types";
 import { hasErrors, validateCreateException, type FieldErrors } from "@/lib/validation";
@@ -30,7 +29,7 @@ export function CreateExceptionModal({
   defaultShipmentId?: string;
   onCreated?: (id: string) => void;
 }) {
-  const { exceptions, createException } = useExceptions();
+  const { exceptions, shipments, createException } = useExceptions();
   const { toast } = useToast();
   const [form, setForm] = useState<CreateExceptionInput>(emptyForm);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -65,6 +64,7 @@ export function CreateExceptionModal({
     const next = validateCreateException(
       form,
       exceptions.map((e) => e.shipmentId),
+      shipments.map((s) => s.id),
     );
     setErrors(next);
     return next;
@@ -147,7 +147,7 @@ export function CreateExceptionModal({
                 className={`${inputBase} font-mono ${fieldError("shipmentId") ? "border-rose-500/40 ring-rose-500/20" : ""}`}
               />
               <datalist id="shipment-ids">
-                {shipmentRows.map((s) => (
+                {shipments.map((s) => (
                   <option key={s.id} value={s.id} />
                 ))}
               </datalist>

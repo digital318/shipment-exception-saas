@@ -10,7 +10,6 @@ import {
   enrichShipmentWithException,
   getExceptionSeverityDisplay,
 } from "@/lib/exception-utils";
-import { shipmentRows } from "@/lib/mock-data";
 import {
   btnPrimary,
   btnSecondary,
@@ -34,6 +33,7 @@ export function ExceptionDetailDrawer({
   onExceptionCreated?: (id: string) => void;
 }) {
   const {
+    shipments,
     getById,
     getByShipmentId,
     updateStatus,
@@ -47,7 +47,7 @@ export function ExceptionDetailDrawer({
 
   const exc = exceptionId ? getById(exceptionId) : shipmentId ? getByShipmentId(shipmentId) : null;
   const ship =
-    shipmentRows.find((s) => s.id === (exc?.shipmentId ?? shipmentId)) ?? null;
+    shipments.find((s) => s.id === (exc?.shipmentId ?? shipmentId)) ?? null;
   const displayShip = ship && exc ? enrichShipmentWithException(ship, exc) : ship;
 
   const isOpen = Boolean(exceptionId || shipmentId);
