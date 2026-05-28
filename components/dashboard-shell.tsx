@@ -12,6 +12,7 @@ import {
   IconSettings,
   IconUsers,
 } from "@/components/icons";
+import { SupabaseStatus } from "@/components/ui/supabase-status";
 import { badgeBase, btnSecondary, sectionLabel } from "@/lib/styles";
 import { useExceptions } from "@/context/exceptions-context";
 
@@ -116,6 +117,9 @@ export function DashboardShell({
           </nav>
 
           <div className="border-t border-white/[0.06] p-4">
+            <div className="mb-3 flex justify-center">
+              <SupabaseStatus />
+            </div>
             <div className="rounded-xl bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4 ring-1 ring-white/[0.06]">
               <p className="text-xs font-semibold text-zinc-200">Enterprise SLA</p>
               <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
@@ -158,7 +162,12 @@ export function DashboardShell({
 
             <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-6 lg:px-8">
               <div className="min-w-0">
-                <p className={sectionLabel}>{eyebrow}</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className={sectionLabel}>{eyebrow}</p>
+                  <span className="lg:hidden">
+                    <SupabaseStatus />
+                  </span>
+                </div>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[1.625rem]">
                   {title}
                 </h1>
