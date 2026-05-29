@@ -131,6 +131,7 @@ export function mapExceptionRecord(
 
   return {
     id: displayId,
+    dbId: row.id,
     shipmentId: shipment?.shipment_number ?? row.shipment_id,
     title: row.title,
     customer: customerName,

@@ -5,7 +5,7 @@ export type FieldErrors = Partial<Record<keyof CreateExceptionInput | "form", st
 
 export function validateCreateException(
   input: CreateExceptionInput,
-  existingShipmentIds: string[],
+  activeExceptionShipmentIds: string[],
   networkShipmentIds: string[],
 ): FieldErrors {
   const errors: FieldErrors = {};
@@ -17,8 +17,9 @@ export function validateCreateException(
     errors.shipmentId = "Use format FP-2026-084219.";
   } else if (!networkShipmentIds.some((s) => s === shipmentId)) {
     errors.shipmentId = "Shipment not found in network.";
-  } else if (existingShipmentIds.includes(shipmentId)) {
-    errors.shipmentId = "An exception already exists for this shipment.";
+  } else if (activeExceptionShipmentIds.includes(shipmentId)) {
+    errors.shipmentId =
+      "This shipment already has an active exception. Choose another shipment or update the existing exception.";
   }
 
   if (!input.title.trim()) {

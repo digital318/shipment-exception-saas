@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { IconX } from "@/components/icons";
 import { useExceptions } from "@/context/exceptions-context";
 import { useToast } from "@/context/toast-context";
 import { EXCEPTION_OWNERS, ISSUE_STATUSES, SEVERITIES } from "@/lib/constants";
+import {
+  getActiveExceptionShipmentIds,
+  getShipmentsEligibleForException,
+} from "@/lib/exception-utils";
 import { btnPrimary, btnSecondary, inputBase, sectionLabel, selectBase } from "@/lib/styles";
 import type { CreateExceptionInput, IssueStatus, Severity } from "@/lib/types";
 import { hasErrors, validateCreateException, type FieldErrors } from "@/lib/validation";
@@ -35,6 +39,16 @@ export function CreateExceptionModal({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  const eligibleShipments = useMemo(
+    () => getShipmentsEligibleForException(shipments, exceptions),
+    [shipments, exceptions],
+  );
+
+  const activeExceptionShipmentIds = useMemo(
+    () => getActiveExceptionShipmentIds(exceptions),
+    [exceptions],
+  );
+
   useEffect(() => {
     if (!open) return;
     setForm({
@@ -63,14 +77,14 @@ export function CreateExceptionModal({
   function validate(): FieldErrors {
     const next = validateCreateException(
       form,
-      exceptions.map((e) => e.shipmentId),
+      activeExceptionShipmentIds,
       shipments.map((s) => s.id),
     );
     setErrors(next);
     return next;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setTouched({
       shipmentId: true,
@@ -85,19 +99,25 @@ export function CreateExceptionModal({
       return;
     }
 
-    const created = createException({
-      ...form,
-      shipmentId: form.shipmentId.trim().toUpperCase(),
-    });
+    try {
+      const created = await createException({
+        ...form,
+        shipmentId: form.shipmentId.trim().toUpperCase(),
+      });
 
-    if (!created) {
-      toast("Could not create exception. Check shipment ID.", "error");
-      return;
+      if (!created) {
+        toast("Could not create exception. Check shipment ID.", "error");
+        return;
+      }
+
+      toast(`Exception ${created.id} created.`, "success");
+      onCreated?.(created.id);
+      onClose();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to create exception.";
+      toast(message, "error");
     }
-
-    toast(`Exception ${created.id} created.`, "success");
-    onCreated?.(created.id);
-    onClose();
   }
 
   function fieldError(name: keyof FieldErrors) {
@@ -147,7 +167,7 @@ export function CreateExceptionModal({
                 className={`${inputBase} font-mono ${fieldError("shipmentId") ? "border-rose-500/40 ring-rose-500/20" : ""}`}
               />
               <datalist id="shipment-ids">
-                {shipments.map((s) => (
+                {eligibleShipments.map((s) => (
                   <option key={s.id} value={s.id} />
                 ))}
               </datalist>

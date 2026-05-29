@@ -32,6 +32,18 @@ export function isActiveException(exc: ExceptionRecord): boolean {
   return exc.status !== "Resolved";
 }
 
+export function getActiveExceptionShipmentIds(exceptions: ExceptionRecord[]): string[] {
+  return exceptions.filter(isActiveException).map((e) => e.shipmentId);
+}
+
+export function getShipmentsEligibleForException(
+  shipments: Shipment[],
+  exceptions: ExceptionRecord[],
+): Shipment[] {
+  const activeShipmentIds = new Set(getActiveExceptionShipmentIds(exceptions));
+  return shipments.filter((s) => !activeShipmentIds.has(s.id));
+}
+
 export function getExceptionSeverityDisplay(exc: ExceptionRecord): {
   label: string;
   className: string;

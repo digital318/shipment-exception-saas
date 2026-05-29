@@ -33,7 +33,10 @@ export type InternalNote = {
 };
 
 export type ExceptionRecord = {
+  /** Display id shown in UI (e.g. EXC-4387). */
   id: string;
+  /** Supabase uuid; present when loaded from or persisted to the database. */
+  dbId?: string;
   shipmentId: string;
   title: string;
   customer: string;

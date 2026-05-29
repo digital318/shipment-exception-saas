@@ -69,22 +69,33 @@ export function ExceptionDetailDrawer({
 
   if (!isOpen) return null;
 
-  function handleAddNote() {
+  async function handleAddNote() {
     if (!exc) return;
     if (noteDraft.trim().length < 3) {
       toast("Note must be at least 3 characters.", "error");
       return;
     }
-    addNote(exc.id, noteDraft);
-    setNoteDraft("");
-    toast("Internal note added.", "success");
+    try {
+      await addNote(exc.id, noteDraft);
+      setNoteDraft("");
+      toast("Internal note added.", "success");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add note.";
+      toast(message, "error");
+    }
   }
 
-  function handleResolve() {
+  async function handleResolve() {
     if (!exc) return;
-    resolveException(exc.id);
-    toast(`${exc.id} marked as resolved.`, "success");
-    onClose();
+    try {
+      await resolveException(exc.id);
+      toast(`${exc.id} marked as resolved.`, "success");
+      onClose();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to resolve exception.";
+      toast(message, "error");
+    }
   }
 
   return (
@@ -151,13 +162,25 @@ export function ExceptionDetailDrawer({
                 noteDraft={noteDraft}
                 onNoteChange={setNoteDraft}
                 onAddNote={handleAddNote}
-                onStatusChange={(status) => {
-                  updateStatus(exc.id, status);
-                  toast(`Status updated to ${status}.`, "success");
+                onStatusChange={async (status) => {
+                  try {
+                    await updateStatus(exc.id, status);
+                    toast(`Status updated to ${status}.`, "success");
+                  } catch (err) {
+                    const message =
+                      err instanceof Error ? err.message : "Failed to update status.";
+                    toast(message, "error");
+                  }
                 }}
-                onOwnerChange={(owner) => {
-                  assignOwner(exc.id, owner);
-                  toast(`Owner assigned to ${owner}.`, "success");
+                onOwnerChange={async (owner) => {
+                  try {
+                    await assignOwner(exc.id, owner);
+                    toast(`Owner assigned to ${owner}.`, "success");
+                  } catch (err) {
+                    const message =
+                      err instanceof Error ? err.message : "Failed to assign owner.";
+                    toast(message, "error");
+                  }
                 }}
                 isResolved={isResolved}
               />
@@ -218,8 +241,8 @@ function ExceptionEditView({
   noteDraft: string;
   onNoteChange: (v: string) => void;
   onAddNote: () => void;
-  onStatusChange: (s: ExceptionRecord["status"]) => void;
-  onOwnerChange: (owner: string) => void;
+  onStatusChange: (s: ExceptionRecord["status"]) => void | Promise<void>;
+  onOwnerChange: (owner: string) => void | Promise<void>;
   isResolved: boolean;
 }) {
   return (
