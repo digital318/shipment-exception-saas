@@ -12,6 +12,8 @@ import {
   IconSettings,
   IconUsers,
 } from "@/components/icons";
+import { LogoutButton } from "@/components/auth/logout-button";
+import { UserMenu } from "@/components/auth/user-menu";
 import { SupabaseStatus } from "@/components/ui/supabase-status";
 import { badgeBase, btnSecondary, sectionLabel } from "@/lib/styles";
 import { useExceptions } from "@/context/exceptions-context";
@@ -117,6 +119,9 @@ export function DashboardShell({
           </nav>
 
           <div className="border-t border-white/[0.06] p-4">
+            <div className="mb-4">
+              <UserMenu />
+            </div>
             <div className="mb-3 flex justify-center">
               <SupabaseStatus />
             </div>
@@ -177,11 +182,12 @@ export function DashboardShell({
                   </p>
                 )}
               </div>
-              {actions && (
-                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                  {actions}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                {actions}
+                <div className="lg:hidden">
+                  <LogoutButton className="!w-auto" />
                 </div>
-              )}
+              </div>
             </div>
           </header>
 
