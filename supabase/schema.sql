@@ -3,6 +3,9 @@
 -- =============================================================================
 -- Persistent storage for logistics exception management.
 --
+-- Phase 4B (organizations + user_profiles + tenant RLS):
+--   See supabase/migrations/004b_organizations.sql — run after this file.
+--
 -- REVIEW ONLY — do not apply automatically.
 -- To apply after review:
 --   1. Open your Supabase project → SQL Editor

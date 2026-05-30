@@ -181,7 +181,13 @@ export function mapShipmentRow(
     originalEta: formatDisplayDate(originalEtaIso),
     delayHours,
     delayReason: exception?.delayReason ?? (delayHours != null ? "Operational delay" : "—"),
-    severity: exception?.severity ?? (delayHours != null && delayHours >= 24 ? "High" : "Low"),
+    severity:
+      exception?.severity ??
+      (delayHours != null && delayHours > 24
+        ? "Critical"
+        : delayHours != null && delayHours > 8
+          ? "High"
+          : "Low"),
     status,
     issueStatus: exception?.status ?? (status === "Delivered" ? "Resolved" : "Open"),
     exception:

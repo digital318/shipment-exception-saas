@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { useOrganization } from "@/context/organization-context";
 import { btnPrimary, btnSecondary, cardSurface, inputBase, sectionLabel } from "@/lib/styles";
 
 export function SettingsPage() {
-  const [companyName, setCompanyName] = useState("FreightPulse Logistics");
-  const [opsEmail, setOpsEmail] = useState("ops@freightpulse.com");
+  const { organization, loading, saveOrganization } = useOrganization();
+
+  const [companyName, setCompanyName] = useState("");
+  const [opsEmail, setOpsEmail] = useState("");
   const [timezone, setTimezone] = useState("America/New_York");
 
   const [emailAlerts, setEmailAlerts] = useState(true);
@@ -19,10 +22,35 @@ export function SettingsPage() {
   const [slaEscalation, setSlaEscalation] = useState("24");
 
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  useEffect(() => {
+    if (!organization) return;
+    setCompanyName(organization.name);
+    setOpsEmail(organization.opsEmail ?? "");
+    setTimezone(organization.timezone);
+  }, [organization]);
+
+  async function handleSave() {
+    if (!organization) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await saveOrganization({
+        name: companyName,
+        opsEmail,
+        timezone,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -31,12 +59,26 @@ export function SettingsPage() {
       title="Settings"
       description="Company profile, notifications, and SLA thresholds"
       actions={
-        <button type="button" onClick={handleSave} className={btnPrimary}>
-          {saved ? "Saved" : "Save changes"}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={loading || saving || !organization}
+          className={btnPrimary}
+        >
+          {saved ? "Saved" : saving ? "Saving…" : "Save changes"}
         </button>
       }
     >
       <div className="mx-auto max-w-2xl space-y-6">
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300"
+          >
+            {error}
+          </p>
+        )}
+
         <section className={`${cardSurface} p-5 sm:p-6`}>
           <h2 className="text-sm font-semibold text-white">Company profile</h2>
           <p className="mt-1 text-xs text-zinc-500">
@@ -49,6 +91,7 @@ export function SettingsPage() {
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
+                disabled={loading || !organization}
                 className={`${inputBase} mt-2`}
               />
             </label>
@@ -58,6 +101,7 @@ export function SettingsPage() {
                 type="email"
                 value={opsEmail}
                 onChange={(e) => setOpsEmail(e.target.value)}
+                disabled={loading || !organization}
                 className={`${inputBase} mt-2`}
               />
             </label>
@@ -66,6 +110,7 @@ export function SettingsPage() {
               <select
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
+                disabled={loading || !organization}
                 className={`${inputBase} mt-2`}
               >
                 <option value="America/New_York">Eastern (ET)</option>
@@ -160,8 +205,13 @@ export function SettingsPage() {
           <button type="button" className={btnSecondary}>
             Reset to defaults
           </button>
-          <button type="button" onClick={handleSave} className={btnPrimary}>
-            {saved ? "Saved" : "Save changes"}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={loading || saving || !organization}
+            className={btnPrimary}
+          >
+            {saved ? "Saved" : saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>

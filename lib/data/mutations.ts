@@ -1,6 +1,11 @@
-import { CURRENT_USER } from "@/lib/constants";
+import { CURRENT_USER, DEFAULT_AUTO_EXCEPTION_OWNER } from "@/lib/constants";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
-import type { CreateExceptionInput, IssueStatus, UpdateExceptionInput } from "@/lib/types";
+import type {
+  CreateExceptionInput,
+  IssueStatus,
+  Severity,
+  UpdateExceptionInput,
+} from "@/lib/types";
 
 export type ExceptionMutationContext = {
   shipmentId: string;
@@ -9,12 +14,16 @@ export type ExceptionMutationContext = {
   actor?: string;
 };
 
-async function lookupShipmentUuid(shipmentNumber: string): Promise<string | null> {
+async function lookupShipmentUuid(
+  shipmentNumber: string,
+  organizationId: string,
+): Promise<string | null> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("shipments")
     .select("id")
     .eq("shipment_number", shipmentNumber)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
   if (error) throw error;
@@ -23,12 +32,14 @@ async function lookupShipmentUuid(shipmentNumber: string): Promise<string | null
 
 async function insertActivityEvent(
   exceptionId: string,
+  organizationId: string,
   eventType: string,
   message: string,
 ): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("activity_events").insert({
     exception_id: exceptionId,
+    organization_id: organizationId,
     event_type: eventType,
     message,
   });
@@ -42,9 +53,10 @@ export function isSupabaseWriteEnabled(): boolean {
 
 export async function createExceptionInSupabase(
   input: CreateExceptionInput,
+  organizationId: string,
   actor = CURRENT_USER,
 ): Promise<string> {
-  const shipmentUuid = await lookupShipmentUuid(input.shipmentId);
+  const shipmentUuid = await lookupShipmentUuid(input.shipmentId, organizationId);
   if (!shipmentUuid) {
     throw new Error(`Shipment ${input.shipmentId} not found.`);
   }
@@ -54,6 +66,7 @@ export async function createExceptionInSupabase(
     .from("exceptions")
     .insert({
       shipment_id: shipmentUuid,
+      organization_id: organizationId,
       title: input.title.trim(),
       severity: input.severity,
       status: input.status ?? "Open",
@@ -67,8 +80,49 @@ export async function createExceptionInSupabase(
 
   await insertActivityEvent(
     data.id,
+    organizationId,
     "action",
     `${actor} opened investigation on ${input.shipmentId} — ${input.title.trim()}`,
+  );
+
+  return data.id;
+}
+
+export async function createAutoDetectedExceptionInSupabase(
+  input: {
+    shipmentUuid: string;
+    shipmentNumber: string;
+    title: string;
+    severity: Severity;
+    delayReason: string;
+    owner?: string;
+  },
+  organizationId: string,
+): Promise<string> {
+  const supabase = getSupabaseClient();
+  const owner = input.owner ?? DEFAULT_AUTO_EXCEPTION_OWNER;
+
+  const { data, error } = await supabase
+    .from("exceptions")
+    .insert({
+      shipment_id: input.shipmentUuid,
+      organization_id: organizationId,
+      title: input.title.trim(),
+      severity: input.severity,
+      status: "Open",
+      owner,
+      delay_reason: input.delayReason.trim(),
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+
+  await insertActivityEvent(
+    data.id,
+    organizationId,
+    "escalation",
+    `Auto-detected ${input.severity} exception on ${input.shipmentNumber} — ${input.title.trim()}`,
   );
 
   return data.id;
@@ -78,6 +132,7 @@ export async function updateExceptionInSupabase(
   dbId: string,
   patch: UpdateExceptionInput,
   context: ExceptionMutationContext,
+  organizationId: string,
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
 
@@ -103,6 +158,7 @@ export async function updateExceptionInSupabase(
   if (patch.status === "Resolved") {
     await insertActivityEvent(
       dbId,
+      organizationId,
       "resolved",
       `Resolved exception on ${context.shipmentId} — ${context.title}`,
     );
@@ -112,6 +168,7 @@ export async function updateExceptionInSupabase(
   ) {
     await insertActivityEvent(
       dbId,
+      organizationId,
       "update",
       `Status changed to ${patch.status} on ${context.shipmentId} — ${context.title}`,
     );
@@ -121,8 +178,9 @@ export async function updateExceptionInSupabase(
 export async function resolveExceptionInSupabase(
   dbId: string,
   context: ExceptionMutationContext,
+  organizationId: string,
 ): Promise<void> {
-  await updateExceptionInSupabase(dbId, { status: "Resolved" }, context);
+  await updateExceptionInSupabase(dbId, { status: "Resolved" }, context, organizationId);
 }
 
 export async function deleteExceptionInSupabase(dbId: string): Promise<void> {
@@ -135,6 +193,7 @@ export async function addExceptionNoteInSupabase(
   dbId: string,
   body: string,
   author: string,
+  organizationId: string,
 ): Promise<string> {
   const trimmed = body.trim();
   if (!trimmed) {
@@ -146,6 +205,7 @@ export async function addExceptionNoteInSupabase(
     .from("exception_notes")
     .insert({
       exception_id: dbId,
+      organization_id: organizationId,
       author,
       note: trimmed,
     })

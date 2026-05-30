@@ -1,5 +1,25 @@
+export type DbOrganization = {
+  id: string;
+  name: string;
+  operations_email: string | null;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbUserProfile = {
+  user_id: string;
+  organization_id: string | null;
+  email: string;
+  display_name: string | null;
+  role: "owner" | "admin" | "member";
+  created_at: string;
+  updated_at: string;
+};
+
 export type DbCustomer = {
   id: string;
+  organization_id: string | null;
   name: string;
   contact_name: string;
   contact_email: string;
@@ -9,6 +29,7 @@ export type DbCustomer = {
 
 export type DbShipment = {
   id: string;
+  organization_id: string | null;
   shipment_number: string;
   customer_id: string;
   carrier: string;
@@ -23,6 +44,7 @@ export type DbShipment = {
 
 export type DbException = {
   id: string;
+  organization_id: string | null;
   shipment_id: string;
   title: string;
   description: string | null;
@@ -38,6 +60,7 @@ export type DbException = {
 
 export type DbExceptionNote = {
   id: string;
+  organization_id: string | null;
   exception_id: string;
   author: string;
   note: string;
@@ -46,6 +69,7 @@ export type DbExceptionNote = {
 
 export type DbActivityEvent = {
   id: string;
+  organization_id: string | null;
   exception_id: string;
   event_type: string;
   message: string;

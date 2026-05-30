@@ -1,4 +1,5 @@
 import { DashboardShell } from "@/components/dashboard-shell";
+import { AutoDetectedAlertsPanel } from "@/components/dashboard/auto-detected-alerts";
 import { HomeDashboardActions } from "@/components/dashboard/home-dashboard-actions";
 import { MetricsGrid } from "@/components/dashboard/metrics-grid";
 import { RecentActivityPanel } from "@/components/dashboard/recent-activity-panel";
@@ -27,6 +28,8 @@ export function HomeDashboard() {
     >
       <div className="space-y-8">
         <MetricsGrid />
+
+        <AutoDetectedAlertsPanel />
 
         <section aria-label="Operational alerts">
           <SectionHeading

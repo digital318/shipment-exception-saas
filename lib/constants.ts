@@ -21,3 +21,6 @@ export const SEVERITIES: Severity[] = ["Critical", "High", "Medium", "Low"];
 export const SHIPMENT_ID_PATTERN = /^FP-\d{4}-\d{6}$/;
 
 export const CURRENT_USER = "Sarah Chen";
+
+/** Default owner assigned to auto-detected exceptions. */
+export const DEFAULT_AUTO_EXCEPTION_OWNER = "Sarah Chen";

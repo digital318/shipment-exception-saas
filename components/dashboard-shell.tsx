@@ -14,6 +14,7 @@ import {
 } from "@/components/icons";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { UserMenu } from "@/components/auth/user-menu";
+import { OrganizationSelector } from "@/components/organization/organization-selector";
 import { SupabaseStatus } from "@/components/ui/supabase-status";
 import { badgeBase, btnSecondary, sectionLabel } from "@/lib/styles";
 import { useExceptions } from "@/context/exceptions-context";
@@ -119,6 +120,9 @@ export function DashboardShell({
           </nav>
 
           <div className="border-t border-white/[0.06] p-4">
+            <div className="mb-4">
+              <OrganizationSelector />
+            </div>
             <div className="mb-4">
               <UserMenu />
             </div>

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAuthRoute, isPublicPath } from "@/lib/auth/routes";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { isAuthRoute, isOnboardingRoute, isPublicPath } from "@/lib/auth/routes";
+import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/supabase/env";
 
 export async function updateSession(request: NextRequest) {
   if (!isSupabaseConfigured()) {
@@ -10,10 +10,9 @@ export async function updateSession(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
+  const { url, key } = getSupabaseEnv();
+
+  const supabase = createServerClient(url, key, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -51,6 +50,30 @@ export async function updateSession(request: NextRequest) {
     homeUrl.pathname = "/";
     homeUrl.search = "";
     return NextResponse.redirect(homeUrl);
+  }
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const needsOnboarding = !profile?.organization_id;
+
+    if (needsOnboarding) {
+      if (!isOnboardingRoute(pathname)) {
+        const onboardingUrl = request.nextUrl.clone();
+        onboardingUrl.pathname = "/onboarding";
+        onboardingUrl.search = "";
+        return NextResponse.redirect(onboardingUrl);
+      }
+    } else if (isOnboardingRoute(pathname)) {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      homeUrl.search = "";
+      return NextResponse.redirect(homeUrl);
+    }
   }
 
   return supabaseResponse;

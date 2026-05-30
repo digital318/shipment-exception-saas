@@ -1,18 +1,21 @@
 import { fetchCustomers } from "./customers";
 import { fetchExceptionsBundle } from "./exceptions";
 import { fetchCarriers, fetchShipments } from "./shipments";
-import type { DataSource } from "./types";
+import type { AppDataSnapshot, DataSource } from "./types";
 import type { ActivityItem, Customer, ExceptionRecord, Shipment } from "@/lib/types";
 
-export type AppDataSnapshot = {
-  shipments: Shipment[];
-  customers: Customer[];
-  carriers: string[];
-  exceptions: ExceptionRecord[];
-  activity: ActivityItem[];
-  source: DataSource;
-  error?: string;
-};
+export type { AppDataSnapshot } from "./types";
+export {
+  runExceptionDetection,
+  runInMemoryExceptionDetection,
+  type DetectionRunResult,
+} from "./exception-detection";
+export {
+  evaluateShipmentForException,
+  evaluateShipmentsForExceptions,
+  type ExceptionDetectionResult,
+  type AutoDetectedAlert,
+} from "@/lib/exception-engine";
 
 export async function fetchAppData(): Promise<AppDataSnapshot> {
   const exceptionsBundle = await fetchExceptionsBundle();

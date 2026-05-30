@@ -10,7 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import { CURRENT_USER } from "@/lib/constants";
+import { useOrganization } from "@/context/organization-context";
+import { useToast } from "@/context/toast-context";
 import { fetchAppData, type AppDataSnapshot } from "@/lib/data";
+import {
+  applyInMemoryDetections,
+  runExceptionDetection,
+  runInMemoryExceptionDetection,
+} from "@/lib/data/exception-detection";
 import {
   addExceptionNoteInSupabase,
   createExceptionInSupabase,
@@ -29,6 +36,7 @@ import {
   generateNoteId,
   isActiveException,
 } from "@/lib/exception-utils";
+import { toAutoDetectedAlert, type AutoDetectedAlert } from "@/lib/exception-engine";
 import type {
   ActivityItem,
   CreateExceptionInput,
@@ -53,6 +61,7 @@ type ExceptionsContextValue = {
   error: string | null;
   source: DataSource;
   openCount: number;
+  autoDetectedAlerts: AutoDetectedAlert[];
   refresh: () => Promise<void>;
   getById: (id: string) => ExceptionRecord | undefined;
   getByShipmentId: (shipmentId: string) => ExceptionRecord | undefined;
@@ -95,14 +104,39 @@ function applySnapshot(
 }
 
 export function ExceptionsProvider({ children }: { children: ReactNode }) {
+  const { organization, loading: orgLoading, needsOnboarding } = useOrganization();
+  const { toast } = useToast();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [carriers, setCarriers] = useState<string[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionRecord[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [autoDetectedAlerts, setAutoDetectedAlerts] = useState<AutoDetectedAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<DataSource>("mock");
+
+  const organizationId = organization?.id;
+
+  const notifyDetections = useCallback(
+    (detections: ReturnType<typeof toAutoDetectedAlert>[]) => {
+      if (detections.length === 0) return;
+
+      setAutoDetectedAlerts((prev) => {
+        const existing = new Set(prev.map((a) => a.shipmentId));
+        const fresh = detections.filter((d) => !existing.has(d.shipmentId));
+        return [...fresh, ...prev];
+      });
+
+      for (const alert of detections) {
+        toast(
+          `Auto-detected ${alert.severity} exception for ${alert.shipmentId}`,
+          "info",
+        );
+      }
+    },
+    [toast],
+  );
 
   const loadData = useCallback(async (options?: LoadOptions): Promise<AppDataSnapshot> => {
     if (!options?.silent) {
@@ -111,7 +145,27 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const snapshot = await fetchAppData();
+      const usingSupabase =
+        isSupabaseWriteEnabled() && !!organizationId && !needsOnboarding;
+
+      if (usingSupabase && organizationId) {
+        const { created } = await runExceptionDetection(organizationId);
+        notifyDetections(created.map((d) => toAutoDetectedAlert(d)));
+      }
+
+      let snapshot = await fetchAppData();
+
+      if (!usingSupabase) {
+        const detections = runInMemoryExceptionDetection(
+          snapshot.shipments,
+          snapshot.exceptions,
+        );
+        if (detections.length > 0) {
+          snapshot = applyInMemoryDetections(snapshot, detections);
+          notifyDetections(detections.map((d) => toAutoDetectedAlert(d)));
+        }
+      }
+
       applySnapshot(snapshot, {
         setShipments,
         setCustomers,
@@ -132,11 +186,13 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [needsOnboarding, notifyDetections, organizationId]);
 
   useEffect(() => {
+    if (orgLoading) return;
+    if (needsOnboarding && organization === null) return;
     void loadData();
-  }, [loadData]);
+  }, [loadData, orgLoading, needsOnboarding, organization?.id]);
 
   const openCount = useMemo(
     () => exceptions.filter((e) => e.status !== "Resolved").length,
@@ -154,7 +210,8 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     [exceptions],
   );
 
-  const persistToSupabase = source === "supabase" && isSupabaseWriteEnabled();
+  const persistToSupabase =
+    source === "supabase" && isSupabaseWriteEnabled() && !!organization?.id;
 
   const requireDbId = useCallback(
     (id: string): ExceptionRecord => {
@@ -191,8 +248,8 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       );
       if (duplicate) return null;
 
-      if (persistToSupabase) {
-        await createExceptionInSupabase(input);
+      if (persistToSupabase && organizationId) {
+        await createExceptionInSupabase(input, organizationId);
         const snapshot = await loadData({ silent: true });
         return (
           snapshot.exceptions.find(
@@ -230,18 +287,18 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       ]);
       return record;
     },
-    [exceptions, shipments, persistToSupabase, loadData],
+    [exceptions, shipments, persistToSupabase, organizationId, loadData],
   );
 
   const updateException = useCallback(
     async (id: string, patch: UpdateExceptionInput) => {
-      if (persistToSupabase) {
+      if (persistToSupabase && organizationId) {
         const exc = requireDbId(id);
         await updateExceptionInSupabase(exc.dbId!, patch, {
           shipmentId: exc.shipmentId,
           title: exc.title,
           previousStatus: exc.status,
-        });
+        }, organizationId);
         await refreshAfterMutation();
         return;
       }
@@ -293,7 +350,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         setActivity((act) => [resolvedEvent!, ...act]);
       }
     },
-    [persistToSupabase, requireDbId, refreshAfterMutation, getById],
+    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation, getById],
   );
 
   const assignOwner = useCallback(
@@ -312,9 +369,9 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       const trimmed = body.trim();
       if (!trimmed) return;
 
-      if (persistToSupabase) {
+      if (persistToSupabase && organizationId) {
         const exc = requireDbId(id);
-        await addExceptionNoteInSupabase(exc.dbId!, trimmed, author);
+        await addExceptionNoteInSupabase(exc.dbId!, trimmed, author, organizationId);
         await refreshAfterMutation();
         return;
       }
@@ -334,7 +391,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         ),
       );
     },
-    [persistToSupabase, requireDbId, refreshAfterMutation],
+    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation],
   );
 
   const updateNote = useCallback(
@@ -390,20 +447,20 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
 
   const resolveException = useCallback(
     async (id: string) => {
-      if (persistToSupabase) {
+      if (persistToSupabase && organizationId) {
         const exc = requireDbId(id);
         await resolveExceptionInSupabase(exc.dbId!, {
           shipmentId: exc.shipmentId,
           title: exc.title,
           previousStatus: exc.status,
-        });
+        }, organizationId);
         await refreshAfterMutation();
         return;
       }
 
       await updateException(id, { status: "Resolved" });
     },
-    [persistToSupabase, requireDbId, refreshAfterMutation, updateException],
+    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation, updateException],
   );
 
   const deleteException = useCallback(
@@ -431,6 +488,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       error,
       source,
       openCount,
+      autoDetectedAlerts,
       refresh: async () => {
         await loadData();
       },
@@ -456,6 +514,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       error,
       source,
       openCount,
+      autoDetectedAlerts,
       loadData,
       getById,
       getByShipmentId,
