@@ -265,12 +265,15 @@ export function mapCustomer(
 
   return {
     id: enrichment?.displayId ?? row.id.slice(0, 8).toUpperCase(),
+    dbId: row.id,
     name: row.name,
+    contactName: row.contact_name,
+    contactEmail: row.contact_email,
     tier,
     accountManager: row.contact_name,
     activeShipments: stats.activeShipments,
     exceptions: stats.exceptions,
-    slaPerformance: Number(row.sla_target_percent),
+    slaTarget: Number(row.sla_target_percent),
     region: enrichment?.region ?? "North America",
   };
 }

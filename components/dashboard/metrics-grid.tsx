@@ -3,32 +3,43 @@
 import {
   IconAlertCircle,
   IconCheckCircle,
-  IconClock,
-  IconTruck,
+  IconHeartPulse,
+  IconUsers,
 } from "@/components/icons";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
-import { useExceptions } from "@/context/exceptions-context";
+import { useSlaIntelligence } from "@/hooks/use-sla-intelligence";
 import { badgeBase, cardSurface } from "@/lib/styles";
 
 export function MetricsGrid() {
-  const { exceptions, shipments, loading, error, openCount, refresh } = useExceptions();
+  const {
+    networkHealthScore,
+    slaCompliancePercent,
+    customersAtRisk,
+    criticalExceptions,
+    openExceptions,
+    overallOnTimePercent,
+    averageSlaTarget,
+    loading,
+    error,
+    refresh,
+  } = useSlaIntelligence();
 
   if (loading) {
     return (
-      <section aria-label="Key metrics">
+      <section aria-label="Intelligence metrics">
         <div className={`${cardSurface} overflow-hidden`}>
           <LoadingState
-            title="Loading metrics"
-            description="Calculating shipment and exception KPIs…"
+            title="Loading intelligence"
+            description="Calculating SLA performance and risk scores…"
           />
         </div>
       </section>
     );
   }
 
-  if (error && shipments.length === 0) {
+  if (error) {
     return (
-      <section aria-label="Key metrics">
+      <section aria-label="Intelligence metrics">
         <div className={`${cardSurface} overflow-hidden`}>
           <ErrorState description={error} onRetry={() => void refresh()} />
         </div>
@@ -36,66 +47,75 @@ export function MetricsGrid() {
     );
   }
 
-  const criticalCount = exceptions.filter(
-    (e) => e.severity === "Critical" && e.status !== "Resolved",
-  ).length;
-  const delayedCount = shipments.filter((s) => s.status === "Delayed").length;
-  const onTimeCount = shipments.filter((s) => s.delayHours === null).length;
-  const onTimePct =
-    shipments.length > 0
-      ? ((onTimeCount / shipments.length) * 100).toFixed(1)
-      : "0.0";
-  const activeShipments = shipments.filter((s) => s.status !== "Delivered").length;
-
   const metrics = [
     {
-      label: "Active Shipments",
-      value: activeShipments.toLocaleString(),
-      delta: `${shipments.length} tracked`,
-      hint: "in network today",
-      trend: "up" as const,
+      label: "Network Health Score",
+      value: String(networkHealthScore),
+      delta: `${openExceptions} open exceptions`,
+      hint: "0–100 risk-adjusted score",
+      trend:
+        networkHealthScore >= 70
+          ? ("up" as const)
+          : networkHealthScore >= 50
+            ? ("neutral" as const)
+            : ("down" as const),
       gradient: "from-violet-500/20 via-indigo-500/10 to-transparent",
-      icon: IconTruck,
+      icon: IconHeartPulse,
       iconColor: "text-violet-400",
       iconBg: "bg-violet-500/10 ring-violet-500/20",
     },
     {
-      label: "Delayed Shipments",
-      value: String(delayedCount),
-      delta: `${delayedCount} on this page`,
-      hint: "require ETA revision",
-      trend: "down" as const,
+      label: "Customers At Risk",
+      value: String(customersAtRisk),
+      delta: customersAtRisk === 0 ? "All on target" : "below SLA threshold",
+      hint: "yellow or red status",
+      trend:
+        customersAtRisk === 0
+          ? ("up" as const)
+          : customersAtRisk <= 2
+            ? ("neutral" as const)
+            : ("down" as const),
       gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
-      icon: IconClock,
+      icon: IconUsers,
       iconColor: "text-amber-400",
       iconBg: "bg-amber-500/10 ring-amber-500/20",
     },
     {
-      label: "Open Exceptions",
-      value: String(openCount),
-      delta: `${criticalCount} critical`,
-      hint: "need resolution",
-      trend: "neutral" as const,
-      gradient: "from-rose-500/20 via-pink-500/10 to-transparent",
-      icon: IconAlertCircle,
-      iconColor: "text-rose-400",
-      iconBg: "bg-rose-500/10 ring-rose-500/20",
-    },
-    {
-      label: "On-Time Delivery",
-      value: `${onTimePct}%`,
-      delta: "97.0%",
-      hint: "weekly SLA target",
-      trend: "up" as const,
+      label: "SLA Compliance",
+      value: `${slaCompliancePercent}%`,
+      delta: `${overallOnTimePercent.toFixed(1)}% on-time`,
+      hint: `avg target ${averageSlaTarget.toFixed(1)}%`,
+      trend:
+        slaCompliancePercent >= 80
+          ? ("up" as const)
+          : slaCompliancePercent >= 60
+            ? ("neutral" as const)
+            : ("down" as const),
       gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
       icon: IconCheckCircle,
       iconColor: "text-emerald-400",
       iconBg: "bg-emerald-500/10 ring-emerald-500/20",
     },
+    {
+      label: "Critical Exceptions",
+      value: String(criticalExceptions),
+      delta: `${openExceptions} total open`,
+      hint: "require immediate action",
+      trend:
+        criticalExceptions === 0
+          ? ("up" as const)
+          : criticalExceptions <= 2
+            ? ("neutral" as const)
+            : ("down" as const),
+      gradient: "from-rose-500/20 via-pink-500/10 to-transparent",
+      icon: IconAlertCircle,
+      iconColor: "text-rose-400",
+      iconBg: "bg-rose-500/10 ring-rose-500/20",
+    },
   ];
 
   return (
-    <section aria-label="Key metrics">
+    <section aria-label="Intelligence metrics">
       <div className="grid gap-4 sm:grid-cols-2 lg:gap-5 xl:grid-cols-4">
         {metrics.map((metric) => (
           <div
@@ -116,8 +136,8 @@ export function MetricsGrid() {
                   metric.trend === "up"
                     ? "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20"
                     : metric.trend === "down"
-                      ? "bg-amber-500/10 text-amber-400 ring-amber-500/20"
-                      : "bg-zinc-500/10 text-zinc-400 ring-zinc-500/20"
+                      ? "bg-rose-500/10 text-rose-400 ring-rose-500/20"
+                      : "bg-amber-500/10 text-amber-400 ring-amber-500/20"
                 }`}
               >
                 {metric.trend === "up" ? "↑" : metric.trend === "down" ? "↓" : "•"}
@@ -135,8 +155,8 @@ export function MetricsGrid() {
                   metric.trend === "up"
                     ? "font-medium text-emerald-400"
                     : metric.trend === "down"
-                      ? "font-medium text-amber-400"
-                      : "font-medium text-zinc-400"
+                      ? "font-medium text-rose-400"
+                      : "font-medium text-amber-400"
                 }
               >
                 {metric.delta}

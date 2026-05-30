@@ -14,16 +14,24 @@ async function fetchUserProfileWithClient(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+  for (const column of ["user_id", "id"] as const) {
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq(column, userId)
+      .maybeSingle();
 
-  if (error) throw error;
-  if (!data) return null;
+    if (error) {
+      console.warn(
+        `[FreightPulse] user_profiles lookup on ${column} failed:`,
+        error.message,
+      );
+      continue;
+    }
+    if (data) return mapUserProfile(data as DbUserProfile);
+  }
 
-  return mapUserProfile(data as DbUserProfile);
+  return null;
 }
 
 async function fetchOrganizationWithClient(

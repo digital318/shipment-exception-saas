@@ -25,17 +25,24 @@ export function mapOrganization(row: DbOrganization): Organization {
   return {
     id: row.id,
     name: row.name,
-    slug: slugifyOrganizationName(row.name),
-    opsEmail: row.operations_email,
+    slug: row.slug ?? slugifyOrganizationName(row.name),
+    opsEmail: row.operations_email ?? row.ops_email ?? null,
     timezone: row.timezone,
   };
 }
 
-export function mapUserProfile(row: DbUserProfile): UserProfile {
+export function mapUserProfile(row: DbUserProfile & { id?: string }): UserProfile {
+  const organizationId =
+    row.organization_id ??
+    (row as { organizationId?: string | null }).organizationId ??
+    (row as { org_id?: string | null }).org_id ??
+    (row as { orgId?: string | null }).orgId ??
+    null;
+
   return {
-    id: row.user_id,
-    organizationId: row.organization_id,
-    displayName: row.display_name,
+    id: row.user_id ?? row.id ?? "",
+    organizationId,
+    displayName: row.display_name ?? (row as { displayName?: string }).displayName ?? null,
     role: row.role,
   };
 }

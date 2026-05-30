@@ -1,7 +1,9 @@
 export type DbOrganization = {
   id: string;
   name: string;
-  operations_email: string | null;
+  slug?: string;
+  operations_email?: string | null;
+  ops_email?: string | null;
   timezone: string;
   created_at: string;
   updated_at: string;

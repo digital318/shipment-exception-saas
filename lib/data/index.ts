@@ -17,10 +17,10 @@ export {
   type AutoDetectedAlert,
 } from "@/lib/exception-engine";
 
-export async function fetchAppData(): Promise<AppDataSnapshot> {
+export async function fetchAppData(organizationId?: string): Promise<AppDataSnapshot> {
   const exceptionsBundle = await fetchExceptionsBundle();
   const shipmentsResult = await fetchShipments(exceptionsBundle.data.exceptions);
-  const customersResult = await fetchCustomers();
+  const customersResult = await fetchCustomers(organizationId);
 
   const source: DataSource =
     exceptionsBundle.source === "supabase" &&

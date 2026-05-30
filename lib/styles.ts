@@ -59,3 +59,21 @@ export const activityTypeStyles: Record<string, string> = {
   resolved: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
   alert: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
 };
+
+export const riskLevelStyles = {
+  green: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  yellow: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
+  red: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
+} as const;
+
+export const riskLevelLabels = {
+  green: "On Target",
+  yellow: "At Risk",
+  red: "Critical",
+} as const;
+
+export const riskLevelBadgeLabels = {
+  green: "Green",
+  yellow: "Yellow",
+  red: "Red",
+} as const;

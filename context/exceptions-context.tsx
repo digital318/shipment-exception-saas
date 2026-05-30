@@ -104,7 +104,7 @@ function applySnapshot(
 }
 
 export function ExceptionsProvider({ children }: { children: ReactNode }) {
-  const { organization, loading: orgLoading, needsOnboarding } = useOrganization();
+  const { organization, profile, loading: orgLoading, needsOnboarding } = useOrganization();
   const { toast } = useToast();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -116,7 +116,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<DataSource>("mock");
 
-  const organizationId = organization?.id;
+  const organizationId = organization?.id ?? profile?.organizationId ?? undefined;
 
   const notifyDetections = useCallback(
     (detections: ReturnType<typeof toAutoDetectedAlert>[]) => {
@@ -153,7 +153,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         notifyDetections(created.map((d) => toAutoDetectedAlert(d)));
       }
 
-      let snapshot = await fetchAppData();
+      let snapshot = await fetchAppData(organizationId);
 
       if (!usingSupabase) {
         const detections = runInMemoryExceptionDetection(
@@ -175,6 +175,12 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         setSource,
         setError,
       });
+      console.info("[FreightPulse] ExceptionsProvider loaded", {
+        organization_id: organizationId ?? null,
+        customerCount: snapshot.customers.length,
+        shipmentCount: snapshot.shipments.length,
+        source: snapshot.source,
+      });
       return snapshot;
     } catch (err) {
       const message =
@@ -190,9 +196,10 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (orgLoading) return;
-    if (needsOnboarding && organization === null) return;
+    if (needsOnboarding) return;
+    if (isSupabaseWriteEnabled() && !organizationId) return;
     void loadData();
-  }, [loadData, orgLoading, needsOnboarding, organization?.id]);
+  }, [loadData, orgLoading, needsOnboarding, organizationId]);
 
   const openCount = useMemo(
     () => exceptions.filter((e) => e.status !== "Resolved").length,

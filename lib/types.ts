@@ -66,13 +66,20 @@ export type UpdateExceptionInput = Partial<
 >;
 
 export type Customer = {
+  /** Display id (e.g. CUS-001) or short uuid prefix. */
   id: string;
+  /** Supabase uuid when loaded from database. */
+  dbId?: string;
   name: string;
+  contactName: string;
+  contactEmail: string;
   tier: "Enterprise" | "Growth" | "Standard";
+  /** @deprecated Use contactName — kept for existing references. */
   accountManager: string;
   activeShipments: number;
   exceptions: number;
-  slaPerformance: number;
+  /** Agreed SLA target percent (from customers.sla_target_percent). */
+  slaTarget: number;
   region: string;
 };
 

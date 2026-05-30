@@ -105,6 +105,15 @@ export function IconCheckCircle({ className }: IconProps) {
   );
 }
 
+export function IconHeartPulse({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M19.5 12.572l-7.5 7.428-7.5-7.428A5 5 0 1112 6.006a5 5 0 017.5 6.566z" />
+      <path d="M12 6v6l2 2" />
+    </svg>
+  );
+}
+
 export function IconSearch({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
