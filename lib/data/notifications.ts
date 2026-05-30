@@ -99,20 +99,54 @@ export async function markNotificationRead(
   if (error) throw error;
 }
 
+/**
+ * Marks every unread notification as read for the given organization.
+ * Requires a definite organization_id — no resolver fallback.
+ */
 export async function markAllNotificationsRead(organizationId: string): Promise<void> {
-  if (!isSupabaseConfigured()) return;
+  const LOG_PREFIX = "[FreightPulse] markAllNotificationsRead";
+
+  if (!organizationId) {
+    const message = "organization_id is required for mark all read";
+    console.error(LOG_PREFIX, message);
+    throw new Error(message);
+  }
+
+  if (!isSupabaseConfigured()) {
+    const message = "Supabase is not configured";
+    console.error(LOG_PREFIX, message);
+    throw new Error(message);
+  }
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase
+  const readAt = new Date().toISOString();
+
+  const { data, error } = await supabase
     .from("notifications")
     .update({
       status: "Read",
-      read_at: new Date().toISOString(),
+      read_at: readAt,
     })
     .eq("organization_id", organizationId)
-    .eq("status", "Unread");
+    .eq("status", "Unread")
+    .select("id");
 
-  if (error) throw error;
+  if (error) {
+    console.error(LOG_PREFIX, "Supabase update error", {
+      organizationId,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
+
+  console.info(LOG_PREFIX, "Supabase update succeeded", {
+    organizationId,
+    updatedCount: data?.length ?? 0,
+    readAt,
+  });
 }
 
 export async function getNotificationsForOrganization(

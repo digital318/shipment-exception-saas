@@ -1,5 +1,6 @@
 import type { DbNotificationWithRelations } from "@/lib/database.types";
-import type { NotificationRecord, NotificationStatus, NotificationType, Severity } from "@/lib/types";
+import { normalizeNotificationStatus } from "@/lib/notifications-utils";
+import type { NotificationRecord, NotificationType, Severity } from "@/lib/types";
 import { formatRelativeTime } from "./format";
 
 export function mapNotification(row: DbNotificationWithRelations): NotificationRecord {
@@ -12,7 +13,7 @@ export function mapNotification(row: DbNotificationWithRelations): NotificationR
     title: row.title,
     message: row.message,
     severity: row.severity as Severity,
-    status: row.status as NotificationStatus,
+    status: normalizeNotificationStatus(row.status),
     createdAt: formatRelativeTime(row.created_at),
     readAt: row.read_at ? formatRelativeTime(row.read_at) : undefined,
     exceptionDisplayId: row.exception_id ? row.exception_id.slice(0, 8).toUpperCase() : undefined,

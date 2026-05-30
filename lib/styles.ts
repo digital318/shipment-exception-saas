@@ -68,10 +68,10 @@ export const notificationTypeStyles: Record<string, string> = {
 };
 
 export const notificationTypeLabels: Record<string, string> = {
-  exception_critical: "Critical",
-  exception_high: "High",
+  exception_critical: "Exception Critical",
+  exception_high: "Alert",
   sla_risk: "SLA Risk",
-  resolution: "Resolved",
+  resolution: "Resolution",
 };
 
 export const riskLevelStyles = {

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   IconAlertTriangle,
   IconBarChart,
+  IconBell,
   IconLayoutDashboard,
   IconLogo,
   IconPackage,
@@ -26,6 +27,7 @@ const navItems = [
   { label: "Dashboard", href: "/", icon: IconLayoutDashboard },
   { label: "Shipments", href: "/shipments", icon: IconPackage },
   { label: "Exceptions", href: "/exceptions", icon: IconAlertTriangle },
+  { label: "Notifications", href: "/notifications", icon: IconBell },
   { label: "Escalations", href: "/escalations", icon: IconZap },
   { label: "Customers", href: "/customers", icon: IconUsers },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
@@ -117,13 +119,18 @@ export function DashboardShell({
                           {openCount}
                         </span>
                       )}
-                      {item.label === "Escalations" && unreadCount > 0 && (
-                        <span
-                          className={`ml-auto ${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`}
-                        >
-                          {unreadCount}
-                        </span>
-                      )}
+                      {(item.label === "Notifications" || item.label === "Escalations") &&
+                        unreadCount > 0 && (
+                          <span
+                            className={`ml-auto ${badgeBase} ${
+                              item.label === "Escalations"
+                                ? "bg-amber-500/10 text-amber-400 ring-amber-500/20"
+                                : "bg-violet-500/10 text-violet-300 ring-violet-500/20"
+                            }`}
+                          >
+                            {unreadCount}
+                          </span>
+                        )}
                     </Link>
                   </li>
                 );

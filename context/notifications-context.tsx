@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { useOrganization } from "@/context/organization-context";
 import { useExceptions } from "@/context/exceptions-context";
 import { useSlaIntelligence } from "@/hooks/use-sla-intelligence";
@@ -20,7 +21,8 @@ import {
   syncSlaRiskNotifications,
 } from "@/lib/data/notifications";
 import { isEscalationNotification } from "@/lib/data/notification-rules";
-import { isSupabaseWriteEnabled } from "@/lib/data/mutations";
+import { countUnreadNotifications } from "@/lib/notifications-utils";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { DataSource } from "@/lib/data/types";
 import type {
   NotificationRecord,
@@ -32,6 +34,7 @@ type NotificationsContextValue = {
   notifications: NotificationRecord[];
   unreadCount: number;
   loading: boolean;
+  error: string | null;
   source: DataSource;
   refresh: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
@@ -106,85 +109,159 @@ function buildMockNotifications(
 }
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const { organization, profile, loading: orgLoading, needsOnboarding } = useOrganization();
   const { exceptions, refresh: refreshExceptions } = useExceptions();
   const { atRiskCustomers } = useSlaIntelligence();
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [mockReadIds, setMockReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<DataSource>("mock");
 
   const organizationId = organization?.id ?? profile?.organizationId ?? undefined;
-  const persistToSupabase =
-    isSupabaseWriteEnabled() && !!organizationId && !needsOnboarding;
+  const useSupabase = isSupabaseConfigured();
 
-  const loadNotifications = useCallback(async () => {
-    if (!persistToSupabase || !organizationId) {
+  const loadNotifications = useCallback(
+    async (options?: { skipSlaSync?: boolean }) => {
+      if (!useSupabase || !organizationId) {
+        setNotifications([]);
+        setSource("mock");
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      setNotifications([]);
+
+      try {
+        if (!options?.skipSlaSync && !needsOnboarding) {
+          await syncSlaRiskNotifications(organizationId, atRiskCustomers);
+        }
+
+        const result = await getNotificationsForOrganization(organizationId);
+
+        if (result.source === "supabase") {
+          setNotifications(result.data);
+          setSource("supabase");
+          setError(result.error ?? null);
+        } else {
+          setNotifications([]);
+          setSource("mock");
+          setError(result.error ?? "Failed to load notifications from Supabase");
+        }
+      } catch (err) {
+        setNotifications([]);
+        setSource("mock");
+        setError(err instanceof Error ? err.message : "Failed to load notifications");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [useSupabase, organizationId, atRiskCustomers, needsOnboarding],
+  );
+
+  useEffect(() => {
+    if (orgLoading) return;
+    if (!useSupabase || !organizationId) {
+      setNotifications([]);
       setSource("mock");
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    try {
-      await syncSlaRiskNotifications(organizationId, atRiskCustomers);
-      const result = await getNotificationsForOrganization(organizationId);
-      setNotifications(result.data);
-      setSource(result.source);
-    } finally {
-      setLoading(false);
-    }
-  }, [persistToSupabase, organizationId, atRiskCustomers]);
+    void loadNotifications({ skipSlaSync: true });
+  }, [loadNotifications, orgLoading, useSupabase, organizationId, pathname]);
 
-  useEffect(() => {
-    if (orgLoading || needsOnboarding) return;
-    if (persistToSupabase && !organizationId) return;
-    void loadNotifications();
-  }, [loadNotifications, orgLoading, needsOnboarding, organizationId, persistToSupabase, exceptions.length]);
-
-  const effectiveNotifications = useMemo(() => {
-    if (persistToSupabase) return notifications;
-    return buildMockNotifications(exceptions, atRiskCustomers, mockReadIds);
-  }, [persistToSupabase, notifications, exceptions, atRiskCustomers, mockReadIds]);
-
-  const unreadCount = useMemo(
-    () => effectiveNotifications.filter((n) => n.status === "Unread").length,
-    [effectiveNotifications],
+  const mockNotifications = useMemo(
+    () => buildMockNotifications(exceptions, atRiskCustomers, mockReadIds),
+    [exceptions, atRiskCustomers, mockReadIds],
   );
 
+  const displayNotifications = useMemo(() => {
+    if (useSupabase && organizationId) {
+      return source === "supabase" ? notifications : [];
+    }
+    return mockNotifications;
+  }, [useSupabase, organizationId, source, notifications, mockNotifications]);
+
+  const unreadCount = useMemo(() => {
+    if (useSupabase && organizationId) {
+      if (source !== "supabase") return 0;
+      return countUnreadNotifications(notifications);
+    }
+    return countUnreadNotifications(mockNotifications);
+  }, [useSupabase, organizationId, source, notifications, mockNotifications]);
+
   const escalationNotifications = useMemo(
-    () => effectiveNotifications.filter((n) => isEscalationNotification(n.type)),
-    [effectiveNotifications],
+    () => displayNotifications.filter((n) => isEscalationNotification(n.type)),
+    [displayNotifications],
   );
 
   const markRead = useCallback(
     async (id: string) => {
-      if (persistToSupabase && organizationId) {
+      if (useSupabase && organizationId) {
         await markNotificationRead(id, organizationId);
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === id ? { ...n, status: "Read" as NotificationStatus } : n,
-          ),
-        );
+        await loadNotifications({ skipSlaSync: true });
         return;
       }
 
       setMockReadIds((prev) => new Set(prev).add(id));
     },
-    [persistToSupabase, organizationId],
+    [useSupabase, organizationId, loadNotifications],
   );
 
   const markAllRead = useCallback(async () => {
-    if (persistToSupabase && organizationId) {
-      await markAllNotificationsRead(organizationId);
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, status: "Read" as NotificationStatus })),
-      );
+    const LOG_PREFIX = "[FreightPulse] markAllRead";
+
+    if (!organizationId) {
+      console.error(LOG_PREFIX, "organization_id missing — cannot mark all read", {
+        organizationId: organization?.id ?? null,
+        profileOrganizationId: profile?.organizationId ?? null,
+      });
+      setError("Cannot mark all read: organization is not loaded.");
       return;
     }
 
-    setMockReadIds(new Set(effectiveNotifications.map((n) => n.id)));
-  }, [persistToSupabase, organizationId, effectiveNotifications]);
+    if (!useSupabase) {
+      setMockReadIds(new Set(mockNotifications.map((n) => n.id)));
+      return;
+    }
+
+    try {
+      await markAllNotificationsRead(organizationId);
+      await loadNotifications({ skipSlaSync: true });
+    } catch (err) {
+      const supabaseError =
+        err && typeof err === "object" && "message" in err
+          ? {
+              message: String((err as { message: unknown }).message),
+              details: "details" in err ? (err as { details: unknown }).details : undefined,
+              hint: "hint" in err ? (err as { hint: unknown }).hint : undefined,
+              code: "code" in err ? (err as { code: unknown }).code : undefined,
+            }
+          : err;
+
+      console.error(LOG_PREFIX, "failed", {
+        organizationId,
+        supabaseError,
+      });
+
+      const message =
+        err instanceof Error ? err.message : "Failed to mark all notifications read";
+      setError(message);
+      throw err;
+    }
+  }, [
+    organizationId,
+    organization?.id,
+    profile?.organizationId,
+    useSupabase,
+    mockNotifications,
+    loadNotifications,
+  ]);
 
   const refresh = useCallback(async () => {
     await refreshExceptions();
@@ -193,9 +270,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      notifications: effectiveNotifications,
+      notifications: displayNotifications,
       unreadCount,
       loading,
+      error,
       source,
       refresh,
       markRead,
@@ -203,9 +281,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       escalationNotifications,
     }),
     [
-      effectiveNotifications,
+      displayNotifications,
       unreadCount,
       loading,
+      error,
       source,
       refresh,
       markRead,

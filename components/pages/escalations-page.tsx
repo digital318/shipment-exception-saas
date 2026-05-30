@@ -1,64 +1,92 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { NotificationListItem } from "@/components/notifications/notification-list-item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
-import { FilterChip } from "@/components/ui/filter-chip";
 import { SyncStatus } from "@/components/ui/sync-status";
 import { useNotifications } from "@/context/notifications-context";
-import {
-  cardSurface,
-  notificationTypeLabels,
-  notificationTypeStyles,
-  sectionLabel,
-  severityStyles,
-} from "@/lib/styles";
-import type { NotificationRecord, NotificationStatus, Severity } from "@/lib/types";
+import { groupEscalationsByCategory } from "@/lib/notifications-utils";
+import { btnSecondary, cardSurface, sectionLabel } from "@/lib/styles";
 
-type SeverityFilter = Severity | "All";
-type StatusFilter = NotificationStatus | "All";
-type TypeFilter = "All" | "Escalations" | "SLA Risk" | "Resolution";
+function EscalationSection({
+  title,
+  description,
+  items,
+  onMarkRead,
+}: {
+  title: string;
+  description: string;
+  items: ReturnType<typeof useNotifications>["notifications"];
+  onMarkRead: (id: string) => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-white">{title}</h2>
+        <p className="mt-1 text-xs text-zinc-500">{description}</p>
+      </div>
+      <div className={`${cardSurface} divide-y divide-white/[0.06]`}>
+        {items.map((notification) => (
+          <NotificationListItem
+            key={notification.id}
+            notification={notification}
+            onMarkRead={onMarkRead}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "rose" | "orange" | "amber" | "violet";
+}) {
+  const toneClasses = {
+    rose: "bg-rose-500/10 text-rose-300 ring-rose-500/20",
+    orange: "bg-orange-500/10 text-orange-300 ring-orange-500/20",
+    amber: "bg-amber-500/10 text-amber-300 ring-amber-500/20",
+    violet: "bg-violet-500/10 text-violet-300 ring-violet-500/20",
+  };
+
+  return (
+    <div className={`${cardSurface} p-4`}>
+      <p className={sectionLabel}>{label}</p>
+      <p
+        className={`mt-2 inline-flex rounded-md px-2.5 py-1 text-2xl font-semibold tabular-nums ring-1 ring-inset ${toneClasses[tone]}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export function EscalationsPage() {
-  const { notifications, escalationNotifications, loading, source, refresh, markRead } =
+  const { notifications, loading, error, source, refresh, markRead, markAllRead } =
     useNotifications();
-  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("All");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
 
-  const filtered = useMemo(() => {
-    let items = notifications;
+  const groups = useMemo(
+    () => groupEscalationsByCategory(notifications),
+    [notifications],
+  );
 
-    if (typeFilter === "Escalations") {
-      items = escalationNotifications.filter(
-        (n) => n.type === "exception_critical" || n.type === "exception_high",
-      );
-    } else if (typeFilter === "SLA Risk") {
-      items = items.filter((n) => n.type === "sla_risk");
-    } else if (typeFilter === "Resolution") {
-      items = items.filter((n) => n.type === "resolution");
-    }
+  const hasEscalations =
+    groups.critical.length > 0 ||
+    groups.high.length > 0 ||
+    groups.slaRisk.length > 0 ||
+    groups.unresolved.length > 0;
 
-    if (severityFilter !== "All") {
-      items = items.filter((n) => n.severity === severityFilter);
-    }
-
-    if (statusFilter !== "All") {
-      items = items.filter((n) => n.status === statusFilter);
-    }
-
-    return items;
-  }, [notifications, escalationNotifications, typeFilter, severityFilter, statusFilter]);
-
-  const counts = useMemo(() => {
-    const unread = notifications.filter((n) => n.status === "Unread").length;
-    const critical = notifications.filter((n) => n.severity === "Critical").length;
-    const sla = notifications.filter((n) => n.type === "sla_risk").length;
-    return { total: notifications.length, unread, critical, sla, filtered: filtered.length };
-  }, [notifications, filtered.length]);
-
-  const syncState = loading ? "syncing" : source === "mock" ? "error" : "live";
+  const syncState = loading ? "syncing" : error || source === "mock" ? "error" : "live";
 
   return (
     <DashboardShell
@@ -66,16 +94,29 @@ export function EscalationsPage() {
       title="Escalations"
       description={
         loading
-          ? "Loading notifications…"
-          : `${counts.filtered} alerts · Critical exceptions, SLA risks, and resolutions`
+          ? "Loading escalations…"
+          : `${groups.unresolved.length} unresolved · Critical, high, and SLA risk alerts`
       }
       actions={
         <>
           <SyncStatus state={syncState} />
+          {groups.unresolved.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void markAllRead()}
+              disabled={loading}
+              className="text-xs font-medium text-violet-400 transition hover:text-violet-300 disabled:opacity-50"
+            >
+              Mark all read
+            </button>
+          )}
+          <Link href="/notifications" className={btnSecondary}>
+            All notifications
+          </Link>
           <button
             type="button"
             onClick={() => void refresh()}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white"
+            className={btnSecondary}
             disabled={loading}
           >
             Refresh
@@ -83,129 +124,68 @@ export function EscalationsPage() {
         </>
       }
     >
-      <div className="mb-5 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Escalations", "SLA Risk", "Resolution"] as const).map((t) => (
-            <FilterChip
-              key={t}
-              label={t}
-              active={typeFilter === t}
-              onClick={() => setTypeFilter(t)}
-            />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Critical", "High", "Medium", "Low"] as const).map((s) => (
-            <FilterChip
-              key={s}
-              label={s}
-              active={severityFilter === s}
-              onClick={() => setSeverityFilter(s)}
-            />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Unread", "Read"] as const).map((s) => (
-            <FilterChip
-              key={s}
-              label={s}
-              active={statusFilter === s}
-              count={
-                s === "Unread"
-                  ? counts.unread
-                  : s === "All"
-                    ? counts.total
-                    : undefined
-              }
-              onClick={() => setStatusFilter(s)}
-            />
-          ))}
-        </div>
-      </div>
-
       {loading ? (
         <div className={cardSurface}>
           <LoadingState
             title="Loading escalations"
-            description="Fetching in-app notifications from Supabase…"
+            description="Fetching critical and SLA risk notifications…"
           />
         </div>
-      ) : source === "mock" && notifications.length === 0 ? (
+      ) : error ? (
         <div className={cardSurface}>
           <ErrorState
-            title="Using mock data"
-            description="Connect Supabase to persist notifications, or create critical/high exceptions to see mock alerts."
+            title="Could not load escalations"
+            description={error}
             onRetry={() => void refresh()}
           />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : !hasEscalations ? (
         <EmptyState
-          title="No matching notifications"
-          description="Adjust filters or wait for new critical exceptions and SLA risk events."
+          title="No active escalations"
+          description="Critical exceptions, high-severity alerts, and SLA risks will appear here when detected."
         />
       ) : (
-        <div className={`${cardSurface} divide-y divide-white/[0.06]`}>
-          {filtered.map((notification) => (
-            <EscalationRow
-              key={notification.id}
-              notification={notification}
-              onMarkRead={(id) => void markRead(id)}
+        <div className="space-y-8">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard label="Critical" value={groups.critical.length} tone="rose" />
+            <MetricCard label="High" value={groups.high.length} tone="orange" />
+            <MetricCard label="SLA Risk" value={groups.slaRisk.length} tone="amber" />
+            <MetricCard
+              label="Unresolved"
+              value={groups.unresolved.length}
+              tone="violet"
             />
-          ))}
+          </div>
+
+          <EscalationSection
+            title="Unresolved operational alerts"
+            description="Unread escalations requiring ops attention."
+            items={groups.unresolved}
+            onMarkRead={(id) => void markRead(id)}
+          />
+
+          <EscalationSection
+            title="Critical notifications"
+            description="Critical-severity exceptions and SLA breaches."
+            items={groups.critical}
+            onMarkRead={(id) => void markRead(id)}
+          />
+
+          <EscalationSection
+            title="High notifications"
+            description="High-severity exception alerts."
+            items={groups.high}
+            onMarkRead={(id) => void markRead(id)}
+          />
+
+          <EscalationSection
+            title="SLA risk notifications"
+            description="Customers below on-time delivery targets."
+            items={groups.slaRisk}
+            onMarkRead={(id) => void markRead(id)}
+          />
         </div>
       )}
     </DashboardShell>
-  );
-}
-
-function EscalationRow({
-  notification,
-  onMarkRead,
-}: {
-  notification: NotificationRecord;
-  onMarkRead: (id: string) => void;
-}) {
-  const isUnread = notification.status === "Unread";
-
-  return (
-    <div
-      className={`flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${
-        isUnread ? "bg-violet-500/[0.03]" : ""
-      }`}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={notificationTypeStyles[notification.type]}>
-            {notificationTypeLabels[notification.type]}
-          </span>
-          <span className={severityStyles[notification.severity]}>
-            {notification.severity}
-          </span>
-          <span
-            className={`${sectionLabel} normal-case tracking-normal ${
-              isUnread ? "text-violet-400" : "text-zinc-600"
-            }`}
-          >
-            {notification.status}
-          </span>
-        </div>
-        <p className="mt-2 text-sm font-semibold text-white">{notification.title}</p>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-500">{notification.message}</p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600">
-          {notification.customerName && <span>{notification.customerName}</span>}
-          {notification.shipmentId && <span>{notification.shipmentId}</span>}
-          <span>{notification.createdAt}</span>
-        </div>
-      </div>
-      {isUnread && (
-        <button
-          type="button"
-          onClick={() => onMarkRead(notification.id)}
-          className="shrink-0 self-start rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white sm:self-center"
-        >
-          Mark read
-        </button>
-      )}
-    </div>
   );
 }

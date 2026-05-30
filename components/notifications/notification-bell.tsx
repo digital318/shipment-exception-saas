@@ -15,7 +15,7 @@ import {
 } from "@/lib/styles";
 import type { NotificationRecord } from "@/lib/types";
 
-function NotificationItem({
+function NotificationDropdownItem({
   notification,
   onMarkRead,
 }: {
@@ -61,10 +61,15 @@ function NotificationItem({
 }
 
 export function NotificationBell() {
-  const { notifications, unreadCount, loading, markRead, markAllRead } =
+  const { notifications, unreadCount, loading, error, markRead, markAllRead, refresh } =
     useNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    void refresh();
+  }, [open, refresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -113,7 +118,7 @@ export function NotificationBell() {
                 {loading ? "Loading…" : `${unreadCount} unread`}
               </p>
             </div>
-            {unreadCount > 0 && (
+            {unreadCount > 0 && !loading && !error && (
               <button
                 type="button"
                 onClick={() => void markAllRead()}
@@ -125,7 +130,24 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-[min(60vh,420px)] divide-y divide-white/[0.04] overflow-y-auto">
-            {recent.length === 0 ? (
+            {loading ? (
+              <div className="px-4 py-10 text-center">
+                <span className="mx-auto block h-6 w-6 animate-spin rounded-full border-2 border-violet-400/30 border-t-violet-400" />
+                <p className="mt-3 text-sm text-zinc-400">Loading notifications…</p>
+              </div>
+            ) : error ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm font-medium text-rose-300">Could not load</p>
+                <p className="mt-1 text-xs text-zinc-500">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => void refresh()}
+                  className="mt-4 text-xs font-medium text-violet-400 transition hover:text-violet-300"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : recent.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <p className="text-sm text-zinc-400">No notifications yet</p>
                 <p className="mt-1 text-xs text-zinc-600">
@@ -134,7 +156,7 @@ export function NotificationBell() {
               </div>
             ) : (
               recent.map((n) => (
-                <NotificationItem
+                <NotificationDropdownItem
                   key={n.id}
                   notification={n}
                   onMarkRead={(id) => void markRead(id)}
@@ -143,13 +165,20 @@ export function NotificationBell() {
             )}
           </div>
 
-          <div className="border-t border-white/[0.06] p-3">
+          <div className="space-y-2 border-t border-white/[0.06] p-3">
             <Link
-              href="/escalations"
+              href="/notifications"
               onClick={() => setOpen(false)}
               className={`block w-full text-center ${btnSecondary}`}
             >
-              View all escalations
+              Notification center
+            </Link>
+            <Link
+              href="/escalations"
+              onClick={() => setOpen(false)}
+              className={`block w-full text-center ${btnSecondary} !border-transparent !bg-transparent text-zinc-500 hover:!text-zinc-300`}
+            >
+              View escalations
             </Link>
           </div>
         </div>
