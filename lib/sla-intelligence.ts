@@ -97,7 +97,7 @@ export function computeCustomerSlaMetrics(
     computeCustomerOnTimePercent(customerShipments);
 
   return {
-    customerId: customer.id,
+    customerId: customer.dbId ?? customer.id,
     customerName: customer.name,
     tier: customer.tier,
     slaTarget: customer.slaTarget,

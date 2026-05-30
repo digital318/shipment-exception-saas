@@ -112,3 +112,39 @@ export type ActivityItem = {
   shipmentId: string | null;
   type: ActivityType;
 };
+
+export type NotificationType =
+  | "exception_critical"
+  | "exception_high"
+  | "sla_risk"
+  | "resolution";
+
+export type NotificationStatus = "Unread" | "Read";
+
+export type NotificationRecord = {
+  id: string;
+  organizationId: string;
+  exceptionId?: string;
+  customerId?: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  severity: Severity;
+  status: NotificationStatus;
+  createdAt: string;
+  readAt?: string;
+  /** Enriched display fields */
+  exceptionDisplayId?: string;
+  customerName?: string;
+  shipmentId?: string;
+};
+
+export type CreateNotificationInput = {
+  organizationId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  severity: Severity;
+  exceptionId?: string;
+  customerId?: string;
+};

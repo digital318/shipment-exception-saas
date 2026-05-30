@@ -11,6 +11,14 @@ export {
   type DetectionRunResult,
 } from "./exception-detection";
 export {
+  createNotification,
+  createEscalationNotification,
+  getNotificationsForOrganization,
+  markNotificationRead,
+  markAllNotificationsRead,
+  syncSlaRiskNotifications,
+} from "./notifications";
+export {
   evaluateShipmentForException,
   evaluateShipmentsForExceptions,
   type ExceptionDetectionResult,

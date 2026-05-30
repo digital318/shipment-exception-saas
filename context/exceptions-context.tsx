@@ -37,6 +37,7 @@ import {
   isActiveException,
 } from "@/lib/exception-utils";
 import { toAutoDetectedAlert, type AutoDetectedAlert } from "@/lib/exception-engine";
+import { notificationTypeForSeverity } from "@/lib/data/notification-rules";
 import type {
   ActivityItem,
   CreateExceptionInput,
@@ -136,6 +137,22 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       }
     },
     [toast],
+  );
+
+  const appendNotificationActivity = useCallback(
+    (shipmentId: string, message: string) => {
+      setActivity((act) => [
+        {
+          time: formatNowLabel(),
+          actor: "System",
+          event: `Notification: ${message}`,
+          shipmentId,
+          type: "alert",
+        },
+        ...act,
+      ]);
+    },
+    [],
   );
 
   const loadData = useCallback(async (options?: LoadOptions): Promise<AppDataSnapshot> => {
@@ -292,9 +309,15 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         },
         ...act,
       ]);
+      if (notificationTypeForSeverity(input.severity)) {
+        appendNotificationActivity(
+          input.shipmentId,
+          `${input.severity} exception — ${input.shipmentId}`,
+        );
+      }
       return record;
     },
-    [exceptions, shipments, persistToSupabase, organizationId, loadData],
+    [exceptions, shipments, persistToSupabase, organizationId, loadData, appendNotificationActivity],
   );
 
   const updateException = useCallback(
@@ -310,21 +333,20 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      let resolvedEvent: ActivityItem | null = null;
+      const existing = getById(id);
+      const resolved: ActivityItem | null =
+        existing && existing.status !== "Resolved" && patch.status === "Resolved"
+          ? {
+              time: formatNowLabel(),
+              actor: CURRENT_USER,
+              event: `Resolved exception on ${existing.shipmentId} — ${existing.title}`,
+              shipmentId: existing.shipmentId,
+              type: "resolved",
+            }
+          : null;
 
-      setExceptions((prev) => {
-        const existing = prev.find((e) => e.id === id);
-        if (existing && existing.status !== "Resolved" && patch.status === "Resolved") {
-          resolvedEvent = {
-            time: formatNowLabel(),
-            actor: CURRENT_USER,
-            event: `Resolved exception on ${existing.shipmentId} — ${existing.title}`,
-            shipmentId: existing.shipmentId,
-            type: "resolved",
-          };
-        }
-
-        return prev.map((e) => {
+      setExceptions((prev) =>
+        prev.map((e) => {
           if (e.id !== id) return e;
           const next = touch({ ...e, ...patch });
           if (patch.status === "Resolved" && !next.resolvedAt) {
@@ -334,11 +356,10 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
             next.resolvedAt = undefined;
           }
           return next;
-        });
-      });
+        }),
+      );
 
       if (patch.status && patch.status !== "Resolved") {
-        const existing = getById(id);
         if (existing && existing.status !== patch.status) {
           setActivity((act) => [
             {
@@ -353,11 +374,17 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (resolvedEvent) {
-        setActivity((act) => [resolvedEvent!, ...act]);
+      if (resolved) {
+        setActivity((act) => [resolved, ...act]);
+        if (resolved.shipmentId) {
+          appendNotificationActivity(
+            resolved.shipmentId,
+            `Exception resolved — ${resolved.shipmentId}`,
+          );
+        }
       }
     },
-    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation, getById],
+    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation, getById, appendNotificationActivity],
   );
 
   const assignOwner = useCallback(

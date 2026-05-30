@@ -11,18 +11,22 @@ import {
   IconPackage,
   IconSettings,
   IconUsers,
+  IconZap,
 } from "@/components/icons";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { UserMenu } from "@/components/auth/user-menu";
 import { OrganizationSelector } from "@/components/organization/organization-selector";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { SupabaseStatus } from "@/components/ui/supabase-status";
 import { badgeBase, btnSecondary, sectionLabel } from "@/lib/styles";
 import { useExceptions } from "@/context/exceptions-context";
+import { useNotifications } from "@/context/notifications-context";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: IconLayoutDashboard },
   { label: "Shipments", href: "/shipments", icon: IconPackage },
   { label: "Exceptions", href: "/exceptions", icon: IconAlertTriangle },
+  { label: "Escalations", href: "/escalations", icon: IconZap },
   { label: "Customers", href: "/customers", icon: IconUsers },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
   { label: "Settings", href: "/settings", icon: IconSettings },
@@ -43,6 +47,7 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const { openCount } = useExceptions();
+  const { unreadCount } = useNotifications();
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#09090b] font-sans text-zinc-100">
@@ -110,6 +115,13 @@ export function DashboardShell({
                           className={`ml-auto ${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`}
                         >
                           {openCount}
+                        </span>
+                      )}
+                      {item.label === "Escalations" && unreadCount > 0 && (
+                        <span
+                          className={`ml-auto ${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`}
+                        >
+                          {unreadCount}
                         </span>
                       )}
                     </Link>
@@ -187,6 +199,7 @@ export function DashboardShell({
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                <NotificationBell />
                 {actions}
                 <div className="lg:hidden">
                   <LogoutButton className="!w-auto" />

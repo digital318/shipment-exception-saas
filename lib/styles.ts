@@ -60,6 +60,20 @@ export const activityTypeStyles: Record<string, string> = {
   alert: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
 };
 
+export const notificationTypeStyles: Record<string, string> = {
+  exception_critical: `${badgeBase} bg-rose-500/10 text-rose-300 ring-rose-500/25`,
+  exception_high: `${badgeBase} bg-orange-500/10 text-orange-300 ring-orange-500/25`,
+  sla_risk: `${badgeBase} bg-amber-500/10 text-amber-300 ring-amber-500/25`,
+  resolution: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+};
+
+export const notificationTypeLabels: Record<string, string> = {
+  exception_critical: "Critical",
+  exception_high: "High",
+  sla_risk: "SLA Risk",
+  resolution: "Resolved",
+};
+
 export const riskLevelStyles = {
   green: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
   yellow: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,

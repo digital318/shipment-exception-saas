@@ -14,6 +14,10 @@ import {
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import type { ActivityItem, ExceptionRecord, Shipment, ShipmentStatus } from "@/lib/types";
 import { createAutoDetectedExceptionInSupabase } from "./mutations";
+import {
+  buildExceptionNotificationInput,
+} from "./notification-rules";
+import { createNotification } from "./notifications";
 
 export type DetectionRunResult = {
   created: ExceptionDetectionResult[];
@@ -27,6 +31,27 @@ type RpcDetectionRow = {
   title: string;
   rule_applied: string;
 };
+
+async function notifyRpcDetections(
+  organizationId: string,
+  rows: RpcDetectionRow[],
+): Promise<void> {
+  for (const row of rows) {
+    const input = buildExceptionNotificationInput(organizationId, {
+      exceptionId: row.exception_id,
+      shipmentNumber: row.shipment_number,
+      title: row.title,
+      severity: row.severity as ExceptionDetectionResult["severity"],
+    });
+    if (!input) continue;
+
+    try {
+      await createNotification(input);
+    } catch {
+      // Non-blocking for detection pipeline.
+    }
+  }
+}
 
 function mapDbShipmentToDetectionInput(row: DbShipmentWithCustomer): ShipmentForDetection {
   return {
@@ -59,7 +84,10 @@ function openExceptionShipmentNumbers(exceptions: ExceptionRecord[]): Set<string
   );
 }
 
-async function runRpcDetection(): Promise<ExceptionDetectionResult[] | null> {
+async function runRpcDetection(): Promise<{
+  created: ExceptionDetectionResult[];
+  rows: RpcDetectionRow[];
+} | null> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("detect_shipment_exceptions");
 
@@ -70,13 +98,17 @@ async function runRpcDetection(): Promise<ExceptionDetectionResult[] | null> {
     throw error;
   }
 
-  return ((data ?? []) as RpcDetectionRow[]).map((row) => ({
-    shipmentNumber: row.shipment_number,
-    severity: row.severity as ExceptionDetectionResult["severity"],
-    title: row.title,
-    delayReason: row.title,
-    rule: row.rule_applied as ExceptionDetectionResult["rule"],
-  }));
+  const rows = (data ?? []) as RpcDetectionRow[];
+  return {
+    rows,
+    created: rows.map((row) => ({
+      shipmentNumber: row.shipment_number,
+      severity: row.severity as ExceptionDetectionResult["severity"],
+      title: row.title,
+      delayReason: row.title,
+      rule: row.rule_applied as ExceptionDetectionResult["rule"],
+    })),
+  };
 }
 
 async function runClientSideDetection(
@@ -157,9 +189,12 @@ export async function runExceptionDetection(
     return { created: [], source: "none" };
   }
 
-  const rpcCreated = await runRpcDetection();
-  if (rpcCreated !== null) {
-    return { created: rpcCreated, source: "rpc" };
+  const rpcResult = await runRpcDetection();
+  if (rpcResult !== null) {
+    if (rpcResult.rows.length > 0) {
+      await notifyRpcDetections(organizationId, rpcResult.rows);
+    }
+    return { created: rpcResult.created, source: "rpc" };
   }
 
   const created = await runClientSideDetection(organizationId);
@@ -209,6 +244,15 @@ export function applyInMemoryDetections(
       shipmentId: detection.shipmentNumber,
       type: "escalation",
     });
+    if (detection.severity === "Critical" || detection.severity === "High") {
+      newActivity.push({
+        time: formatNowLabel(),
+        actor: "System",
+        event: `Notification: ${detection.severity} exception — ${detection.shipmentNumber}`,
+        shipmentId: detection.shipmentNumber,
+        type: "alert",
+      });
+    }
   }
 
   const exceptions = [...newExceptions, ...snapshot.exceptions];

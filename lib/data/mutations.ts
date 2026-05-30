@@ -6,6 +6,11 @@ import type {
   Severity,
   UpdateExceptionInput,
 } from "@/lib/types";
+import {
+  buildExceptionNotificationInput,
+  buildResolutionNotificationInput,
+} from "./notification-rules";
+import { createNotification } from "./notifications";
 
 export type ExceptionMutationContext = {
   shipmentId: string;
@@ -47,6 +52,49 @@ async function insertActivityEvent(
   if (error) throw error;
 }
 
+async function notifyExceptionCreated(
+  organizationId: string,
+  exceptionId: string,
+  shipmentNumber: string,
+  title: string,
+  severity: Severity,
+  customerName?: string,
+): Promise<void> {
+  const input = buildExceptionNotificationInput(organizationId, {
+    exceptionId,
+    shipmentNumber,
+    title,
+    severity,
+    customerName,
+  });
+  if (!input) return;
+
+  try {
+    await createNotification(input);
+  } catch {
+    // Notification failure should not block exception writes.
+  }
+}
+
+async function notifyExceptionResolved(
+  organizationId: string,
+  exceptionId: string,
+  shipmentNumber: string,
+  title: string,
+): Promise<void> {
+  const input = buildResolutionNotificationInput(organizationId, {
+    exceptionId,
+    shipmentNumber,
+    title,
+  });
+
+  try {
+    await createNotification(input);
+  } catch {
+    // Notification failure should not block exception writes.
+  }
+}
+
 export function isSupabaseWriteEnabled(): boolean {
   return isSupabaseConfigured();
 }
@@ -83,6 +131,14 @@ export async function createExceptionInSupabase(
     organizationId,
     "action",
     `${actor} opened investigation on ${input.shipmentId} — ${input.title.trim()}`,
+  );
+
+  await notifyExceptionCreated(
+    organizationId,
+    data.id,
+    input.shipmentId,
+    input.title.trim(),
+    input.severity,
   );
 
   return data.id;
@@ -125,6 +181,14 @@ export async function createAutoDetectedExceptionInSupabase(
     `Auto-detected ${input.severity} exception on ${input.shipmentNumber} — ${input.title.trim()}`,
   );
 
+  await notifyExceptionCreated(
+    organizationId,
+    data.id,
+    input.shipmentNumber,
+    input.title.trim(),
+    input.severity,
+  );
+
   return data.id;
 }
 
@@ -161,6 +225,12 @@ export async function updateExceptionInSupabase(
       organizationId,
       "resolved",
       `Resolved exception on ${context.shipmentId} — ${context.title}`,
+    );
+    await notifyExceptionResolved(
+      organizationId,
+      dbId,
+      context.shipmentId,
+      context.title,
     );
   } else if (
     patch.status !== undefined &&

@@ -93,3 +93,26 @@ export type DbActivityEventWithRelations = DbActivityEvent & {
     shipment: Pick<DbShipment, "shipment_number"> | null;
   } | null;
 };
+
+export type DbNotification = {
+  id: string;
+  organization_id: string;
+  exception_id: string | null;
+  customer_id: string | null;
+  type: string;
+  title: string;
+  message: string;
+  severity: string;
+  status: string;
+  created_at: string;
+  read_at: string | null;
+};
+
+export type DbNotificationWithRelations = DbNotification & {
+  exception: {
+    id: string;
+    title: string;
+    shipment: Pick<DbShipment, "shipment_number"> | null;
+  } | null;
+  customer: Pick<DbCustomer, "id" | "name"> | null;
+};
