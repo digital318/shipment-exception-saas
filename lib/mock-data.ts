@@ -1,13 +1,51 @@
 import type {
   CarrierPerformance,
+  CarrierStatus,
   Customer,
   DelayReasonSummary,
   ExceptionRecord,
   Shipment,
+  ShipmentStatus,
   WeeklyTrendPoint,
 } from "./types";
+import { generateTrackingNumber, resolveCarrierKey } from "./carriers";
 
-export const shipmentRows: Shipment[] = [
+type ShipmentBase = Omit<
+  Shipment,
+  "trackingNumber" | "carrierStatus" | "lastCarrierUpdate" | "estimatedDelivery" | "actualDelivery"
+>;
+
+const STATUS_TO_CARRIER: Record<ShipmentStatus, CarrierStatus> = {
+  "In Transit": "In Transit",
+  Delayed: "Delayed",
+  Delivered: "Delivered",
+  Exception: "Exception",
+};
+
+function enrichCarrierTracking(shipment: ShipmentBase): Shipment {
+  const key = resolveCarrierKey(shipment.carrier);
+  if (!key) {
+    return {
+      ...shipment,
+      trackingNumber: null,
+      carrierStatus: null,
+      lastCarrierUpdate: null,
+      estimatedDelivery: null,
+      actualDelivery: null,
+    };
+  }
+
+  return {
+    ...shipment,
+    trackingNumber: generateTrackingNumber(shipment.id, key),
+    carrierStatus: STATUS_TO_CARRIER[shipment.status],
+    lastCarrierUpdate: "May 28, 2026 · 08:30",
+    estimatedDelivery: shipment.status !== "Delivered" ? shipment.eta : null,
+    actualDelivery: shipment.status === "Delivered" ? shipment.eta : null,
+  };
+}
+
+const baseShipmentRows: ShipmentBase[] = [
   {
     id: "FP-2026-084219",
     customer: "Meridian Industrial Supply",
@@ -169,6 +207,8 @@ export const shipmentRows: Shipment[] = [
     exception: "Chain of custody intact",
   },
 ];
+
+export const shipmentRows: Shipment[] = baseShipmentRows.map(enrichCarrierTracking);
 
 export const initialExceptionRecords: ExceptionRecord[] = [
   {

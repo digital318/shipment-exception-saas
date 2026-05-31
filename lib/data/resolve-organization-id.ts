@@ -4,26 +4,14 @@ const LOG_PREFIX = "[FreightPulse] resolveOrganizationId";
 
 type ProfileOrgRow = {
   organization_id?: string | null;
-  organizationId?: string | null;
-  org_id?: string | null;
-  orgId?: string | null;
-  tenant_id?: string | null;
-  tenantId?: string | null;
 };
 
-/** Normalize org id from a DB row that may use snake_case or camelCase. */
+/** Read organization_id from a Supabase row (snake_case column only). */
 export function readOrganizationId(
   row: ProfileOrgRow | null | undefined,
 ): string | null {
   if (!row) return null;
-  const id =
-    row.organization_id ??
-    row.organizationId ??
-    row.org_id ??
-    row.orgId ??
-    row.tenant_id ??
-    row.tenantId ??
-    null;
+  const id = row.organization_id ?? null;
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
@@ -71,7 +59,6 @@ export async function resolveOrganizationId(
         lookupColumn: column,
         rawRow: data,
         organization_id: (data as ProfileOrgRow).organization_id ?? null,
-        organizationId: (data as ProfileOrgRow).organizationId ?? null,
         resolvedOrganizationId: organizationId,
       });
       if (organizationId) return organizationId;
@@ -89,7 +76,7 @@ export async function logOrganizationCustomerComparison(
 ): Promise<void> {
   const { data: profileRows } = await supabase
     .from("user_profiles")
-    .select("organization_id, organizationId, user_id, id")
+    .select("organization_id, user_id, id")
     .limit(1);
 
   const { data: filteredCustomers, error: filteredError } = await supabase

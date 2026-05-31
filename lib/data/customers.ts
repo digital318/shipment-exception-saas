@@ -60,10 +60,10 @@ function normalizeDbCustomer(row: Record<string, unknown>): DbCustomer {
     id: String(row.id ?? ""),
     organization_id: readOrganizationId(row as DbCustomer),
     name: String(row.name ?? ""),
-    contact_name: String(row.contact_name ?? row.contactName ?? ""),
-    contact_email: String(row.contact_email ?? row.contactEmail ?? ""),
-    sla_target_percent: Number(row.sla_target_percent ?? row.slaTarget ?? 0),
-    created_at: String(row.created_at ?? row.createdAt ?? new Date().toISOString()),
+    contact_name: String(row.contact_name ?? ""),
+    contact_email: String(row.contact_email ?? ""),
+    sla_target_percent: Number(row.sla_target_percent ?? 0),
+    created_at: String(row.created_at ?? new Date().toISOString()),
   };
 }
 

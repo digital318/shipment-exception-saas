@@ -11,6 +11,7 @@ import {
   IconLogo,
   IconPackage,
   IconSettings,
+  IconTruck,
   IconUsers,
   IconZap,
 } from "@/components/icons";
@@ -30,6 +31,7 @@ const navItems = [
   { label: "Notifications", href: "/notifications", icon: IconBell },
   { label: "Escalations", href: "/escalations", icon: IconZap },
   { label: "Customers", href: "/customers", icon: IconUsers },
+  { label: "Carriers", href: "/carriers", icon: IconTruck },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
   { label: "Settings", href: "/settings", icon: IconSettings },
 ];

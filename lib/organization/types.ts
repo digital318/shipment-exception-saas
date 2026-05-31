@@ -32,17 +32,10 @@ export function mapOrganization(row: DbOrganization): Organization {
 }
 
 export function mapUserProfile(row: DbUserProfile & { id?: string }): UserProfile {
-  const organizationId =
-    row.organization_id ??
-    (row as { organizationId?: string | null }).organizationId ??
-    (row as { org_id?: string | null }).org_id ??
-    (row as { orgId?: string | null }).orgId ??
-    null;
-
   return {
     id: row.user_id ?? row.id ?? "",
-    organizationId,
-    displayName: row.display_name ?? (row as { displayName?: string }).displayName ?? null,
+    organizationId: row.organization_id ?? null,
+    displayName: row.display_name ?? null,
     role: row.role,
   };
 }

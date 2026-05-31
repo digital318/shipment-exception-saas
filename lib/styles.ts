@@ -1,4 +1,4 @@
-import type { IssueStatus, Severity, ShipmentStatus } from "./types";
+import type { IssueStatus, Severity, ShipmentStatus, CarrierStatus } from "./types";
 
 export const badgeBase =
   "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium leading-none ring-1 ring-inset";
@@ -26,6 +26,27 @@ export const inputBase =
 
 export const selectBase =
   "rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/[0.14] focus:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20";
+
+export const carrierStatusBadgeStyles: Record<CarrierStatus, string> = {
+  "In Transit": `${badgeBase} bg-sky-500/10 text-sky-300 ring-sky-500/20`,
+  Delayed: `${badgeBase} bg-amber-500/10 text-amber-300 ring-amber-500/20`,
+  "Out for Delivery": `${badgeBase} bg-violet-500/10 text-violet-300 ring-violet-500/20`,
+  Delivered: `${badgeBase} bg-emerald-500/10 text-emerald-300 ring-emerald-500/20`,
+  Exception: `${badgeBase} bg-rose-500/10 text-rose-300 ring-rose-500/20`,
+};
+
+export const carrierHealthStyles = {
+  healthy: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  degraded: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
+  offline: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
+} as const;
+
+export const carrierSyncStatusStyles = {
+  idle: `${badgeBase} bg-zinc-500/10 text-zinc-400 ring-zinc-500/20`,
+  syncing: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
+  success: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  error: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
+} as const;
 
 export const statusBadgeStyles: Record<ShipmentStatus, string> = {
   "In Transit": `${badgeBase} bg-sky-500/10 text-sky-300 ring-sky-500/20`,

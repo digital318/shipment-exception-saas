@@ -7,6 +7,7 @@ import type {
 import type {
   ActivityItem,
   ActivityType,
+  CarrierStatus,
   Customer,
   ExceptionRecord,
   InternalNote,
@@ -15,6 +16,7 @@ import type {
   Shipment,
   ShipmentStatus,
 } from "@/lib/types";
+import { generateTrackingNumber, resolveCarrierKey } from "@/lib/carriers";
 import { formatDisplayDate, formatRelativeTime, subtractHours } from "./format";
 
 const CUSTOMER_ENRICHMENT: Record<
@@ -170,6 +172,11 @@ export function mapShipmentRow(
       ? subtractHours(row.eta, delayHours)
       : row.eta;
 
+  const carrierKey = resolveCarrierKey(row.carrier);
+  const trackingNumber =
+    row.tracking_number ??
+    (carrierKey ? generateTrackingNumber(row.shipment_number, carrierKey) : null);
+
   return {
     id: row.shipment_number,
     customer: row.customer?.name ?? "Unknown customer",
@@ -196,6 +203,17 @@ export function mapShipmentRow(
           ? `Resolved — ${exception.title}`
           : exception.title
         : defaultExceptionText(status),
+    trackingNumber,
+    carrierStatus: (row.carrier_status as CarrierStatus | null) ?? null,
+    lastCarrierUpdate: row.last_carrier_update
+      ? formatDisplayDate(row.last_carrier_update)
+      : null,
+    estimatedDelivery: row.estimated_delivery
+      ? formatDisplayDate(row.estimated_delivery)
+      : null,
+    actualDelivery: row.actual_delivery
+      ? formatDisplayDate(row.actual_delivery)
+      : null,
   };
 }
 

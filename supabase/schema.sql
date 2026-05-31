@@ -68,18 +68,23 @@ CREATE INDEX idx_customers_contact_email ON public.customers (contact_email);
 -- fields power the shipments dashboard and feed exception creation.
 
 CREATE TABLE public.shipments (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  shipment_number  text NOT NULL UNIQUE,
-  customer_id      uuid NOT NULL REFERENCES public.customers (id) ON DELETE RESTRICT,
-  carrier          text NOT NULL,
-  origin           text NOT NULL,
-  destination      text NOT NULL,
-  eta              timestamptz NOT NULL,
-  status           text NOT NULL,
-  delay_hours      integer
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shipment_number      text NOT NULL UNIQUE,
+  customer_id          uuid NOT NULL REFERENCES public.customers (id) ON DELETE RESTRICT,
+  carrier              text NOT NULL,
+  origin               text NOT NULL,
+  destination          text NOT NULL,
+  eta                  timestamptz NOT NULL,
+  status               text NOT NULL,
+  delay_hours          integer
     CHECK (delay_hours IS NULL OR delay_hours >= 0),
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  updated_at       timestamptz NOT NULL DEFAULT now()
+  tracking_number      text,
+  carrier_status       text,
+  last_carrier_update  timestamptz,
+  estimated_delivery   timestamptz,
+  actual_delivery      timestamptz,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.shipments IS

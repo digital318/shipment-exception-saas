@@ -1,4 +1,34 @@
 export type ShipmentStatus = "In Transit" | "Delayed" | "Delivered" | "Exception";
+
+export type CarrierStatus =
+  | "In Transit"
+  | "Delayed"
+  | "Out for Delivery"
+  | "Delivered"
+  | "Exception";
+
+export type CarrierKey = "ups" | "fedex" | "xpo" | "odfl" | "estes" | "saia";
+
+export type CarrierHealth = "healthy" | "degraded" | "offline";
+
+export type CarrierSyncStatus = "idle" | "syncing" | "success" | "error";
+
+export type CarrierShipmentEvent = {
+  timestamp: string;
+  status: CarrierStatus;
+  location: string;
+  description: string;
+};
+
+export type CarrierIntegration = {
+  key: CarrierKey;
+  name: string;
+  enabled: boolean;
+  health: CarrierHealth;
+  lastSyncAt: string | null;
+  shipmentsMonitored: number;
+  syncStatus: CarrierSyncStatus;
+};
 export type Severity = "Critical" | "High" | "Medium" | "Low";
 export type IssueStatus =
   | "Open"
@@ -23,6 +53,11 @@ export type Shipment = {
   status: ShipmentStatus;
   issueStatus: IssueStatus;
   exception: string;
+  trackingNumber: string | null;
+  carrierStatus: CarrierStatus | null;
+  lastCarrierUpdate: string | null;
+  estimatedDelivery: string | null;
+  actualDelivery: string | null;
 };
 
 export type InternalNote = {

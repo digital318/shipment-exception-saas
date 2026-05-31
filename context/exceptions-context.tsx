@@ -38,6 +38,13 @@ import {
 } from "@/lib/exception-utils";
 import { toAutoDetectedAlert, type AutoDetectedAlert } from "@/lib/exception-engine";
 import { notificationTypeForSeverity } from "@/lib/data/notification-rules";
+import {
+  applySyncResultToShipment,
+  buildMockExceptionFromSync,
+  syncOrganizationShipments,
+  type OrganizationSyncResult,
+} from "@/lib/services/carrier-sync";
+import type { CarrierKey } from "@/lib/types";
 import type {
   ActivityItem,
   CreateExceptionInput,
@@ -75,6 +82,7 @@ type ExceptionsContextValue = {
   deleteNote: (exceptionId: string, noteId: string) => Promise<void>;
   resolveException: (id: string) => Promise<void>;
   deleteException: (id: string) => Promise<void>;
+  syncCarriers: (carrierFilter?: CarrierKey) => Promise<OrganizationSyncResult>;
 };
 
 const ExceptionsContext = createContext<ExceptionsContextValue | null>(null);
@@ -511,6 +519,72 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     [persistToSupabase, requireDbId, refreshAfterMutation],
   );
 
+  const syncCarriers = useCallback(
+    async (carrierFilter?: CarrierKey): Promise<OrganizationSyncResult> => {
+      const result = await syncOrganizationShipments(
+        shipments,
+        persistToSupabase ? organizationId : undefined,
+        exceptions,
+        carrierFilter,
+      );
+
+      if (persistToSupabase) {
+        await loadData({ silent: true });
+        return result;
+      }
+
+      setShipments((prev) =>
+        prev.map((shipment) => {
+          const syncResult = result.results.find((r) => r.shipmentNumber === shipment.id);
+          return syncResult ? applySyncResultToShipment(shipment, syncResult) : shipment;
+        }),
+      );
+
+      const newExceptions: ExceptionRecord[] = [];
+      const newActivity: ActivityItem[] = [];
+
+      for (const syncResult of result.results) {
+        if (!syncResult.exceptionCreated || !syncResult.exceptionTitle) continue;
+        const shipment = shipments.find((s) => s.id === syncResult.shipmentNumber);
+        if (!shipment) continue;
+
+        const record = buildMockExceptionFromSync(syncResult, shipment, [
+          ...exceptions,
+          ...newExceptions,
+        ]);
+        if (!record) continue;
+
+        newExceptions.push(record);
+        newActivity.push(
+          {
+            time: formatNowLabel(),
+            actor: "Carrier API",
+            event: `Auto-detected High exception on ${shipment.id} — ${record.title}`,
+            shipmentId: shipment.id,
+            type: "escalation",
+          },
+          {
+            time: formatNowLabel(),
+            actor: "System",
+            event: `Notification: High exception — ${shipment.id}`,
+            shipmentId: shipment.id,
+            type: "alert",
+          },
+        );
+      }
+
+      if (newExceptions.length > 0) {
+        setExceptions((prev) => [...newExceptions, ...prev]);
+      }
+      if (newActivity.length > 0) {
+        setActivity((prev) => [...newActivity, ...prev]);
+      }
+
+      return result;
+    },
+    [shipments, exceptions, persistToSupabase, organizationId, loadData],
+  );
+
   const value = useMemo(
     () => ({
       shipments,
@@ -537,6 +611,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       deleteNote,
       resolveException,
       deleteException,
+      syncCarriers,
     }),
     [
       shipments,
@@ -561,6 +636,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       deleteNote,
       resolveException,
       deleteException,
+      syncCarriers,
     ],
   );
 

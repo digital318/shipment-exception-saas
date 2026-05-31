@@ -40,6 +40,11 @@ export type DbShipment = {
   eta: string;
   status: string;
   delay_hours: number | null;
+  tracking_number: string | null;
+  carrier_status: string | null;
+  last_carrier_update: string | null;
+  estimated_delivery: string | null;
+  actual_delivery: string | null;
   created_at: string;
   updated_at: string;
 };
