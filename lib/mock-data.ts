@@ -9,6 +9,7 @@ import type {
   WeeklyTrendPoint,
 } from "./types";
 import { generateTrackingNumber, resolveCarrierKey } from "./carriers";
+import { assignPlaybook, getRecommendedAction } from "./playbooks";
 
 type ShipmentBase = Omit<
   Shipment,
@@ -211,30 +212,33 @@ const baseShipmentRows: ShipmentBase[] = [
 export const shipmentRows: Shipment[] = baseShipmentRows.map(enrichCarrierTracking);
 
 export const initialExceptionRecords: ExceptionRecord[] = [
-  {
-    id: "EXC-4401",
-    shipmentId: "FP-2026-084301",
-    title: "SLA breach risk — production line stoppage",
-    customer: "Summit Automotive Parts",
-    carrier: "Schneider National",
-    route: "Detroit, MI → Dallas, TX",
-    severity: "Critical",
-    status: "Escalated",
-    owner: "Sarah Chen",
-    delayReason: "Driver HOS reset — mandatory 10-hr break",
-    openedAt: "May 27, 2026 · 08:12",
-    updatedAt: "5 min ago",
-    source: "Manual",
-    internalNotes: [
-      {
-        id: "note-1",
-        author: "Sarah Chen",
-        body: "Escalated to carrier VP — awaiting callback within 2h.",
-        createdAt: "May 27, 2026 · 09:00",
-      },
-    ],
-  },
-  {
+  enrichWithPlaybook(
+    {
+      id: "EXC-4401",
+      shipmentId: "FP-2026-084301",
+      title: "SLA breach risk — production line stoppage",
+      customer: "Summit Automotive Parts",
+      carrier: "Schneider National",
+      route: "Detroit, MI → Dallas, TX",
+      severity: "Critical",
+      status: "Escalated",
+      owner: "Sarah Chen",
+      delayReason: "Driver HOS reset — mandatory 10-hr break",
+      openedAt: "May 27, 2026 · 08:12",
+      updatedAt: "5 min ago",
+      source: "Manual",
+      internalNotes: [
+        {
+          id: "note-1",
+          author: "Sarah Chen",
+          body: "Escalated to carrier VP — awaiting callback within 2h.",
+          createdAt: "May 27, 2026 · 09:00",
+        },
+      ],
+    },
+    { escalationLevel: 2 },
+  ),
+  enrichWithPlaybook({
     id: "EXC-4398",
     shipmentId: "FP-2026-084412",
     title: "Port demurrage accruing — chassis shortage",
@@ -249,8 +253,8 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     updatedAt: "22 min ago",
     source: "Manual",
     internalNotes: [],
-  },
-  {
+  }),
+  enrichWithPlaybook({
     id: "EXC-4395",
     shipmentId: "FP-2026-084219",
     title: "Missed Nashville linehaul connection",
@@ -265,8 +269,8 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     updatedAt: "1 hr ago",
     source: "Manual",
     internalNotes: [],
-  },
-  {
+  }),
+  enrichWithPlaybook({
     id: "EXC-4392",
     shipmentId: "FP-2026-084156",
     title: "Weather delay — I-10 corridor closure",
@@ -281,8 +285,8 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     updatedAt: "34 min ago",
     source: "Manual",
     internalNotes: [],
-  },
-  {
+  }),
+  enrichWithPlaybook({
     id: "EXC-4388",
     shipmentId: "FP-2026-084088",
     title: "Address verification — suite mismatch",
@@ -297,8 +301,8 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     updatedAt: "18 min ago",
     source: "Manual",
     internalNotes: [],
-  },
-  {
+  }),
+  enrichWithPlaybook({
     id: "EXC-4381",
     shipmentId: "FP-2026-084501",
     title: "Terminal outbound dock delay",
@@ -313,8 +317,31 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     updatedAt: "2 hr ago",
     source: "Manual",
     internalNotes: [],
-  },
+  }),
 ];
+
+function enrichWithPlaybook(
+  exc: ExceptionRecord,
+  overrides?: { escalationLevel?: 1 | 2 | 3 | 4; nextFollowUpAt?: string },
+): ExceptionRecord {
+  const playbook = assignPlaybook({
+    title: exc.title,
+    delayReason: exc.delayReason,
+    severity: exc.severity,
+    source: exc.source,
+  });
+  const escalationLevel = overrides?.escalationLevel ?? playbook.escalationLevel;
+  return {
+    ...exc,
+    owner: playbook.owner,
+    playbookType: playbook.playbookType,
+    escalationLevel,
+    recommendedAction: getRecommendedAction(playbook.playbookType, escalationLevel),
+    nextFollowUpAt:
+      overrides?.nextFollowUpAt ??
+      new Date(Date.now() - 30 * 60_000).toISOString(),
+  };
+}
 
 /** @deprecated Use initialExceptionRecords via ExceptionsProvider */
 export const exceptionRecords = initialExceptionRecords;

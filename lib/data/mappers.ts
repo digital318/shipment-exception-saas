@@ -16,6 +16,8 @@ import type {
   Shipment,
   ShipmentStatus,
   ExceptionSource,
+  EscalationLevel,
+  PlaybookType,
 } from "@/lib/types";
 import { generateTrackingNumber, resolveCarrierKey } from "@/lib/carriers";
 import { formatDisplayDate, formatRelativeTime, subtractHours } from "./format";
@@ -153,6 +155,10 @@ export function mapExceptionRecord(
     updatedAt: formatRelativeTime(row.updated_at),
     resolvedAt: row.resolved_at ? formatDisplayDate(row.resolved_at) : undefined,
     source: mapExceptionSource(row.source),
+    playbookType: row.playbook_type as PlaybookType | undefined,
+    escalationLevel: (row.escalation_level ?? 1) as EscalationLevel,
+    recommendedAction: row.recommended_action ?? undefined,
+    nextFollowUpAt: row.next_follow_up_at ?? undefined,
     internalNotes: (row.exception_notes ?? [])
       .sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),

@@ -1,9 +1,9 @@
-import { DEFAULT_AUTO_EXCEPTION_OWNER } from "@/lib/constants";
 import {
   buildExceptionFromShipment,
   formatNowLabel,
   generateExceptionId,
 } from "@/lib/exception-utils";
+import { assignPlaybook } from "@/lib/playbooks";
 import type { AppDataSnapshot } from "@/lib/data/types";
 import type { DbShipmentWithCustomer } from "@/lib/database.types";
 import {
@@ -167,7 +167,7 @@ async function runClientSideDetection(
         title: detection.title,
         severity: detection.severity,
         delayReason: detection.delayReason,
-        owner: DEFAULT_AUTO_EXCEPTION_OWNER,
+        rule: detection.rule,
       },
       organizationId,
     );
@@ -232,9 +232,25 @@ export function applyInMemoryDetections(
       title: detection.title,
       severity: detection.severity,
       delayReason: detection.delayReason,
-      owner: DEFAULT_AUTO_EXCEPTION_OWNER,
+      owner: assignPlaybook({
+        title: detection.title,
+        delayReason: detection.delayReason,
+        severity: detection.severity,
+        rule: detection.rule,
+      }).owner,
       status: "Open",
     });
+
+    const playbook = assignPlaybook({
+      title: detection.title,
+      delayReason: detection.delayReason,
+      severity: detection.severity,
+      rule: detection.rule,
+    });
+    record.playbookType = playbook.playbookType;
+    record.escalationLevel = playbook.escalationLevel;
+    record.recommendedAction = playbook.recommendedAction;
+    record.nextFollowUpAt = playbook.nextFollowUpAt;
 
     newExceptions.push(record);
     newActivity.push({
@@ -243,6 +259,13 @@ export function applyInMemoryDetections(
       event: `Auto-detected ${detection.severity} exception on ${detection.shipmentNumber} — ${detection.title}`,
       shipmentId: detection.shipmentNumber,
       type: "escalation",
+    });
+    newActivity.push({
+      time: formatNowLabel(),
+      actor: "System",
+      event: `Playbook assigned — ${playbook.playbookType} (Level 1: Operations Review) · Owner: ${playbook.owner}`,
+      shipmentId: detection.shipmentNumber,
+      type: "action",
     });
     if (detection.severity === "Critical" || detection.severity === "High") {
       newActivity.push({

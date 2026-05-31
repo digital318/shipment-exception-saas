@@ -1,9 +1,19 @@
-import { CURRENT_USER, DEFAULT_AUTO_EXCEPTION_OWNER } from "@/lib/constants";
+import { CURRENT_USER } from "@/lib/constants";
+import {
+  assignPlaybook,
+  computeNextFollowUp,
+  formatEscalationLevel,
+  getRecommendedAction,
+  nextEscalationLevel,
+  type PlaybookAssignmentInput,
+} from "@/lib/playbooks";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { throwReadableError } from "@/lib/supabase/format-error";
 import type {
   CreateExceptionInput,
+  EscalationLevel,
   IssueStatus,
+  PlaybookType,
   Severity,
   UpdateExceptionInput,
 } from "@/lib/types";
@@ -19,7 +29,36 @@ export type ExceptionMutationContext = {
   title: string;
   previousStatus?: IssueStatus;
   actor?: string;
+  severity?: Severity;
+  playbookType?: PlaybookType;
+  escalationLevel?: EscalationLevel;
 };
+
+function buildPlaybookFields(input: PlaybookAssignmentInput) {
+  const assignment = assignPlaybook(input);
+  return {
+    owner: assignment.owner,
+    playbook_type: assignment.playbookType,
+    escalation_level: assignment.escalationLevel,
+    recommended_action: assignment.recommendedAction,
+    next_follow_up_at: assignment.nextFollowUpAt,
+    assignment,
+  };
+}
+
+async function insertPlaybookAssignedActivity(
+  exceptionId: string,
+  organizationId: string,
+  shipmentNumber: string,
+  assignment: ReturnType<typeof assignPlaybook>,
+): Promise<void> {
+  await insertActivityEvent(
+    exceptionId,
+    organizationId,
+    "action",
+    `Playbook assigned — ${assignment.playbookType} (${formatEscalationLevel(assignment.escalationLevel)}) · Owner: ${assignment.owner} · ${shipmentNumber}`,
+  );
+}
 
 async function lookupShipmentUuid(
   shipmentNumber: string,
@@ -112,6 +151,13 @@ export async function createExceptionInSupabase(
   }
 
   const supabase = getSupabaseClient();
+  const playbook = buildPlaybookFields({
+    title: input.title.trim(),
+    delayReason: input.delayReason.trim(),
+    severity: input.severity,
+    source: "Manual",
+  });
+
   const { data, error } = await supabase
     .from("exceptions")
     .insert({
@@ -120,9 +166,13 @@ export async function createExceptionInSupabase(
       title: input.title.trim(),
       severity: input.severity,
       status: input.status ?? "Open",
-      owner: input.owner,
+      owner: playbook.owner,
       delay_reason: input.delayReason.trim(),
       source: "manual",
+      playbook_type: playbook.playbook_type,
+      escalation_level: playbook.escalation_level,
+      recommended_action: playbook.recommended_action,
+      next_follow_up_at: playbook.next_follow_up_at,
     })
     .select("id")
     .single();
@@ -134,6 +184,13 @@ export async function createExceptionInSupabase(
     organizationId,
     "action",
     `${actor} opened investigation on ${input.shipmentId} — ${input.title.trim()}`,
+  );
+
+  await insertPlaybookAssignedActivity(
+    data.id,
+    organizationId,
+    input.shipmentId,
+    playbook.assignment,
   );
 
   await notifyExceptionCreated(
@@ -154,12 +211,18 @@ export async function createAutoDetectedExceptionInSupabase(
     title: string;
     severity: Severity;
     delayReason: string;
-    owner?: string;
+    rule?: PlaybookAssignmentInput["rule"];
   },
   organizationId: string,
 ): Promise<string> {
   const supabase = getSupabaseClient();
-  const owner = input.owner ?? DEFAULT_AUTO_EXCEPTION_OWNER;
+  const playbook = buildPlaybookFields({
+    title: input.title.trim(),
+    delayReason: input.delayReason.trim(),
+    severity: input.severity,
+    source: "Manual",
+    rule: input.rule,
+  });
 
   const { data, error } = await supabase
     .from("exceptions")
@@ -169,9 +232,13 @@ export async function createAutoDetectedExceptionInSupabase(
       title: input.title.trim(),
       severity: input.severity,
       status: "Open",
-      owner,
+      owner: playbook.owner,
       delay_reason: input.delayReason.trim(),
       source: "manual",
+      playbook_type: playbook.playbook_type,
+      escalation_level: playbook.escalation_level,
+      recommended_action: playbook.recommended_action,
+      next_follow_up_at: playbook.next_follow_up_at,
     })
     .select("id")
     .single();
@@ -183,6 +250,13 @@ export async function createAutoDetectedExceptionInSupabase(
     organizationId,
     "escalation",
     `Auto-detected ${input.severity} exception on ${input.shipmentNumber} — ${input.title.trim()}`,
+  );
+
+  await insertPlaybookAssignedActivity(
+    data.id,
+    organizationId,
+    input.shipmentNumber,
+    playbook.assignment,
   );
 
   await notifyExceptionCreated(
@@ -203,12 +277,16 @@ export async function createCarrierSyncExceptionInSupabase(
     title: string;
     severity: Severity;
     delayReason: string;
-    owner?: string;
   },
   organizationId: string,
 ): Promise<string> {
   const supabase = getSupabaseClient();
-  const owner = input.owner ?? DEFAULT_AUTO_EXCEPTION_OWNER;
+  const playbook = buildPlaybookFields({
+    title: input.title.trim(),
+    delayReason: input.delayReason.trim(),
+    severity: input.severity,
+    source: "Carrier Sync",
+  });
 
   const { data, error } = await supabase
     .from("exceptions")
@@ -218,9 +296,13 @@ export async function createCarrierSyncExceptionInSupabase(
       title: input.title.trim(),
       severity: input.severity,
       status: "Open",
-      owner,
+      owner: playbook.owner,
       delay_reason: input.delayReason.trim(),
       source: "carrier_sync",
+      playbook_type: playbook.playbook_type,
+      escalation_level: playbook.escalation_level,
+      recommended_action: playbook.recommended_action,
+      next_follow_up_at: playbook.next_follow_up_at,
     })
     .select("id")
     .single();
@@ -232,6 +314,13 @@ export async function createCarrierSyncExceptionInSupabase(
     organizationId,
     "alert",
     `Carrier exception detected on ${input.shipmentNumber} — ${input.title.trim()}`,
+  );
+
+  await insertPlaybookAssignedActivity(
+    data.id,
+    organizationId,
+    input.shipmentNumber,
+    playbook.assignment,
   );
 
   const notificationInput = buildCarrierExceptionNotificationInput(organizationId, {
@@ -263,6 +352,10 @@ export async function updateExceptionInSupabase(
   if (patch.status !== undefined) updates.status = patch.status;
   if (patch.owner !== undefined) updates.owner = patch.owner;
   if (patch.delayReason !== undefined) updates.delay_reason = patch.delayReason;
+  if (patch.playbookType !== undefined) updates.playbook_type = patch.playbookType;
+  if (patch.escalationLevel !== undefined) updates.escalation_level = patch.escalationLevel;
+  if (patch.recommendedAction !== undefined) updates.recommended_action = patch.recommendedAction;
+  if (patch.nextFollowUpAt !== undefined) updates.next_follow_up_at = patch.nextFollowUpAt;
 
   if (patch.status === "Resolved") {
     updates.resolved_at = new Date().toISOString();
@@ -366,4 +459,67 @@ export async function deleteExceptionNoteInSupabase(noteId: string): Promise<voi
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("exception_notes").delete().eq("id", noteId);
   if (error) throw error;
+}
+
+export async function completeFollowUpInSupabase(
+  dbId: string,
+  context: ExceptionMutationContext,
+  organizationId: string,
+  actor = CURRENT_USER,
+): Promise<void> {
+  if (!context.severity) {
+    throw new Error("Severity is required to schedule the next follow-up.");
+  }
+
+  const nextFollowUpAt = computeNextFollowUp(context.severity);
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from("exceptions")
+    .update({ next_follow_up_at: nextFollowUpAt })
+    .eq("id", dbId);
+
+  if (error) throw error;
+
+  await insertActivityEvent(
+    dbId,
+    organizationId,
+    "update",
+    `${actor} completed follow-up on ${context.shipmentId} — next check scheduled`,
+  );
+}
+
+export async function escalatePlaybookInSupabase(
+  dbId: string,
+  context: ExceptionMutationContext,
+  organizationId: string,
+  actor = CURRENT_USER,
+): Promise<void> {
+  const currentLevel = (context.escalationLevel ?? 1) as EscalationLevel;
+  const nextLevel = nextEscalationLevel(currentLevel);
+  if (!nextLevel || !context.playbookType) {
+    throw new Error("Exception is already at maximum escalation level.");
+  }
+
+  const recommendedAction = getRecommendedAction(context.playbookType, nextLevel);
+  const updates: Record<string, unknown> = {
+    escalation_level: nextLevel,
+    recommended_action: recommendedAction,
+    status: "Escalated",
+  };
+
+  if (context.severity) {
+    updates.next_follow_up_at = computeNextFollowUp(context.severity);
+  }
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("exceptions").update(updates).eq("id", dbId);
+
+  if (error) throw error;
+
+  await insertActivityEvent(
+    dbId,
+    organizationId,
+    "escalation",
+    `${actor} escalated exception on ${context.shipmentId} to ${formatEscalationLevel(nextLevel)}`,
+  );
 }

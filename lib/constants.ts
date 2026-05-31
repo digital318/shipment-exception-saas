@@ -4,6 +4,7 @@ export const EXCEPTION_OWNERS = [
   "Sarah Chen",
   "Marcus Webb",
   "Lisa Park",
+  "System",
   "Unassigned",
 ] as const;
 

@@ -62,6 +62,10 @@ export type DbException = {
   resolution_summary: string | null;
   resolved_at: string | null;
   source: string;
+  playbook_type: string | null;
+  escalation_level: number;
+  recommended_action: string | null;
+  next_follow_up_at: string | null;
   created_at: string;
   updated_at: string;
 };

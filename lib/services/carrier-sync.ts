@@ -1,4 +1,4 @@
-import { DEFAULT_AUTO_EXCEPTION_OWNER } from "@/lib/constants";
+import { assignPlaybook } from "@/lib/playbooks";
 import {
   generateTrackingNumber,
   getCarrierProviderForName,
@@ -113,7 +113,6 @@ export async function createExceptionsFromCarrierEvents(
         title,
         severity: "High",
         delayReason,
-        owner: DEFAULT_AUTO_EXCEPTION_OWNER,
       },
       organizationId,
     );
@@ -401,6 +400,14 @@ export function buildMockExceptionFromSync(
 
   if (hasActiveCarrierException(existingExceptions, shipment.id)) return null;
 
+  const delayReason = result.events[0]?.description ?? "Carrier reported exception";
+  const playbook = assignPlaybook({
+    title: result.exceptionTitle,
+    delayReason,
+    severity: "High",
+    source: "Carrier Sync",
+  });
+
   const idNum = 4400 + existingExceptions.length + 1;
   return {
     id: `EXC-${idNum}`,
@@ -411,8 +418,8 @@ export function buildMockExceptionFromSync(
     route: `${shipment.origin} → ${shipment.destination}`,
     severity: "High",
     status: "Open",
-    owner: DEFAULT_AUTO_EXCEPTION_OWNER,
-    delayReason: result.events[0]?.description ?? "Carrier reported exception",
+    owner: playbook.owner,
+    delayReason,
     openedAt: new Date().toLocaleString("en-US", {
       month: "short",
       day: "numeric",
@@ -422,6 +429,10 @@ export function buildMockExceptionFromSync(
     }).replace(",", " ·"),
     updatedAt: "Just now",
     source: "Carrier Sync",
+    playbookType: playbook.playbookType,
+    escalationLevel: playbook.escalationLevel,
+    recommendedAction: playbook.recommendedAction,
+    nextFollowUpAt: playbook.nextFollowUpAt,
     internalNotes: [],
   };
 }
@@ -491,6 +502,13 @@ export function buildMockSimulatedException(
 ): ExceptionRecord | null {
   if (hasActiveCarrierException(existingExceptions, shipment.id)) return null;
 
+  const playbook = assignPlaybook({
+    title: SIMULATED_CARRIER_EXCEPTION_TITLE,
+    delayReason: SIMULATED_CARRIER_EXCEPTION_DELAY_REASON,
+    severity: "High",
+    source: "Carrier Sync",
+  });
+
   const idNum = 4400 + existingExceptions.length + 1;
   return {
     id: `EXC-${idNum}`,
@@ -501,7 +519,7 @@ export function buildMockSimulatedException(
     route: `${shipment.origin} → ${shipment.destination}`,
     severity: "High",
     status: "Open",
-    owner: "System",
+    owner: playbook.owner,
     delayReason: SIMULATED_CARRIER_EXCEPTION_DELAY_REASON,
     openedAt: new Date().toLocaleString("en-US", {
       month: "short",
@@ -512,6 +530,10 @@ export function buildMockSimulatedException(
     }).replace(",", " ·"),
     updatedAt: "Just now",
     source: "Carrier Sync",
+    playbookType: playbook.playbookType,
+    escalationLevel: playbook.escalationLevel,
+    recommendedAction: playbook.recommendedAction,
+    nextFollowUpAt: playbook.nextFollowUpAt,
     internalNotes: [],
   };
 }
@@ -586,7 +608,6 @@ export async function simulateCarrierException(
             title: SIMULATED_CARRIER_EXCEPTION_TITLE,
             severity: "High",
             delayReason: SIMULATED_CARRIER_EXCEPTION_DELAY_REASON,
-            owner: "System",
           },
           organizationId,
         );

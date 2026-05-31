@@ -41,6 +41,17 @@ export type IssueStatus =
 /** How the exception was created — shown in the detail drawer and carrier widget. */
 export type ExceptionSource = "Manual" | "Carrier Sync";
 
+export type PlaybookType =
+  | "Carrier Delay"
+  | "SLA Risk"
+  | "Terminal Congestion"
+  | "Weather Delay"
+  | "Address Issue"
+  | "Delivery Confirmation"
+  | "Critical Customer Impact";
+
+export type EscalationLevel = 1 | 2 | 3 | 4;
+
 export type Shipment = {
   id: string;
   customer: string;
@@ -89,6 +100,11 @@ export type ExceptionRecord = {
   resolvedAt?: string;
   /** Defaults to Manual when not set (legacy mock / SLA auto-detect). */
   source?: ExceptionSource;
+  playbookType?: PlaybookType;
+  escalationLevel?: EscalationLevel;
+  recommendedAction?: string;
+  /** ISO timestamp for next follow-up; display via formatFollowUpDisplay. */
+  nextFollowUpAt?: string;
   internalNotes: InternalNote[];
 };
 
@@ -102,7 +118,18 @@ export type CreateExceptionInput = {
 };
 
 export type UpdateExceptionInput = Partial<
-  Pick<ExceptionRecord, "title" | "severity" | "status" | "owner" | "delayReason">
+  Pick<
+    ExceptionRecord,
+    | "title"
+    | "severity"
+    | "status"
+    | "owner"
+    | "delayReason"
+    | "playbookType"
+    | "escalationLevel"
+    | "recommendedAction"
+    | "nextFollowUpAt"
+  >
 >;
 
 export type Customer = {

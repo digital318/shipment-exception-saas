@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CreateExceptionModal } from "@/components/exceptions/create-exception-modal";
+import { PlaybookPanel } from "@/components/exceptions/playbook-panel";
 import { IconX } from "@/components/icons";
 import { useExceptions } from "@/context/exceptions-context";
 import { useToast } from "@/context/toast-context";
@@ -40,6 +41,8 @@ export function ExceptionDetailDrawer({
     assignOwner,
     addNote,
     resolveException,
+    completeFollowUp,
+    escalatePlaybook,
   } = useExceptions();
   const { toast } = useToast();
   const [noteDraft, setNoteDraft] = useState("");
@@ -162,6 +165,8 @@ export function ExceptionDetailDrawer({
                 noteDraft={noteDraft}
                 onNoteChange={setNoteDraft}
                 onAddNote={handleAddNote}
+                onCompleteFollowUp={() => completeFollowUp(exc.id)}
+                onEscalate={() => escalatePlaybook(exc.id)}
                 onStatusChange={async (status) => {
                   try {
                     await updateStatus(exc.id, status);
@@ -233,6 +238,8 @@ function ExceptionEditView({
   noteDraft,
   onNoteChange,
   onAddNote,
+  onCompleteFollowUp,
+  onEscalate,
   onStatusChange,
   onOwnerChange,
   isResolved,
@@ -241,12 +248,21 @@ function ExceptionEditView({
   noteDraft: string;
   onNoteChange: (v: string) => void;
   onAddNote: () => void;
+  onCompleteFollowUp: () => Promise<void>;
+  onEscalate: () => Promise<void>;
   onStatusChange: (s: ExceptionRecord["status"]) => void | Promise<void>;
   onOwnerChange: (owner: string) => void | Promise<void>;
   isResolved: boolean;
 }) {
   return (
     <div className="space-y-6">
+      <PlaybookPanel
+        exc={exc}
+        isResolved={isResolved}
+        onCompleteFollowUp={onCompleteFollowUp}
+        onEscalate={onEscalate}
+      />
+
       <dl className="space-y-3 text-sm">
         <Row label="Shipment" value={exc.shipmentId} mono />
         <Row label="Customer" value={exc.customer} />

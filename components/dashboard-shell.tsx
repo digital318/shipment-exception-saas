@@ -10,6 +10,7 @@ import {
   IconLayoutDashboard,
   IconLogo,
   IconPackage,
+  IconPlaybook,
   IconSettings,
   IconTruck,
   IconUsers,
@@ -30,6 +31,7 @@ const navItems = [
   { label: "Exceptions", href: "/exceptions", icon: IconAlertTriangle },
   { label: "Notifications", href: "/notifications", icon: IconBell },
   { label: "Escalations", href: "/escalations", icon: IconZap },
+  { label: "Playbooks", href: "/playbooks", icon: IconPlaybook },
   { label: "Customers", href: "/customers", icon: IconUsers },
   { label: "Carriers", href: "/carriers", icon: IconTruck },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
@@ -156,7 +158,7 @@ export function DashboardShell({
                 Auto-escalation, carrier API sync, and custom playbooks enabled.
               </p>
               <Link
-                href="/settings"
+                href="/playbooks"
                 className={`mt-4 block w-full text-center ${btnSecondary} !bg-white !text-zinc-900 hover:!bg-zinc-100`}
               >
                 View Playbooks

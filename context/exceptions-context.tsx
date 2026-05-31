@@ -20,9 +20,11 @@ import {
 } from "@/lib/data/exception-detection";
 import {
   addExceptionNoteInSupabase,
+  completeFollowUpInSupabase,
   createExceptionInSupabase,
   deleteExceptionInSupabase,
   deleteExceptionNoteInSupabase,
+  escalatePlaybookInSupabase,
   isSupabaseWriteEnabled,
   resolveExceptionInSupabase,
   updateExceptionInSupabase,
@@ -50,6 +52,13 @@ import {
 } from "@/lib/services/carrier-sync";
 import { resolveCarrierKey } from "@/lib/carriers";
 import { formatUnknownError, logSimulateExceptionError } from "@/lib/supabase/format-error";
+import {
+  assignPlaybook,
+  computeNextFollowUp,
+  formatEscalationLevel,
+  getRecommendedAction,
+  nextEscalationLevel,
+} from "@/lib/playbooks";
 import type { CarrierKey } from "@/lib/types";
 import type {
   ActivityItem,
@@ -88,6 +97,8 @@ type ExceptionsContextValue = {
   deleteNote: (exceptionId: string, noteId: string) => Promise<void>;
   resolveException: (id: string) => Promise<void>;
   deleteException: (id: string) => Promise<void>;
+  completeFollowUp: (id: string) => Promise<void>;
+  escalatePlaybook: (id: string) => Promise<void>;
   syncCarriers: (carrierFilter?: CarrierKey) => Promise<OrganizationSyncResult>;
   simulateCarrierException: (carrierKey: CarrierKey) => Promise<SimulateCarrierExceptionResult>;
 };
@@ -296,6 +307,13 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         );
       }
 
+      const playbook = assignPlaybook({
+        title: input.title.trim(),
+        delayReason: input.delayReason.trim(),
+        severity: input.severity,
+        source: "Manual",
+      });
+
       const record: ExceptionRecord = {
         id: generateExceptionId(exceptions),
         shipmentId: input.shipmentId,
@@ -305,11 +323,15 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         route: `${shipment.origin} → ${shipment.destination}`,
         severity: input.severity,
         status: input.status ?? "Open",
-        owner: input.owner,
+        owner: playbook.owner,
         delayReason: input.delayReason.trim(),
         openedAt: formatOpenedAt(),
         updatedAt: formatNowLabel(),
         source: "Manual",
+        playbookType: playbook.playbookType,
+        escalationLevel: playbook.escalationLevel,
+        recommendedAction: playbook.recommendedAction,
+        nextFollowUpAt: playbook.nextFollowUpAt,
         internalNotes: [],
       };
 
@@ -319,6 +341,13 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
           time: formatNowLabel(),
           actor: CURRENT_USER,
           event: `Opened investigation on ${input.shipmentId} — ${input.title.trim()}`,
+          shipmentId: input.shipmentId,
+          type: "action",
+        },
+        {
+          time: formatNowLabel(),
+          actor: "System",
+          event: `Playbook assigned — ${playbook.playbookType} (${formatEscalationLevel(playbook.escalationLevel)}) · Owner: ${playbook.owner}`,
           shipmentId: input.shipmentId,
           type: "action",
         },
@@ -526,6 +555,105 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     [persistToSupabase, requireDbId, refreshAfterMutation],
   );
 
+  const completeFollowUp = useCallback(
+    async (id: string) => {
+      if (persistToSupabase && organizationId) {
+        const exc = requireDbId(id);
+        await completeFollowUpInSupabase(
+          exc.dbId!,
+          {
+            shipmentId: exc.shipmentId,
+            title: exc.title,
+            severity: exc.severity,
+          },
+          organizationId,
+        );
+        await refreshAfterMutation();
+        return;
+      }
+
+      const exc = getById(id);
+      if (!exc) return;
+
+      const nextFollowUpAt = computeNextFollowUp(exc.severity);
+      setExceptions((prev) =>
+        prev.map((e) =>
+          e.id === id ? touch({ ...e, nextFollowUpAt }) : e,
+        ),
+      );
+      setActivity((act) => [
+        {
+          time: formatNowLabel(),
+          actor: CURRENT_USER,
+          event: `${CURRENT_USER} completed follow-up on ${exc.shipmentId} — next check scheduled`,
+          shipmentId: exc.shipmentId,
+          type: "update",
+        },
+        ...act,
+      ]);
+    },
+    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation, getById],
+  );
+
+  const escalatePlaybook = useCallback(
+    async (id: string) => {
+      if (persistToSupabase && organizationId) {
+        const exc = requireDbId(id);
+        await escalatePlaybookInSupabase(
+          exc.dbId!,
+          {
+            shipmentId: exc.shipmentId,
+            title: exc.title,
+            severity: exc.severity,
+            playbookType: exc.playbookType,
+            escalationLevel: exc.escalationLevel,
+          },
+          organizationId,
+        );
+        await refreshAfterMutation();
+        return;
+      }
+
+      const exc = getById(id);
+      if (!exc || !exc.playbookType || !exc.escalationLevel) {
+        throw new Error("Exception has no playbook assigned.");
+      }
+
+      const nextLevel = nextEscalationLevel(exc.escalationLevel);
+      if (!nextLevel) {
+        throw new Error("Exception is already at maximum escalation level.");
+      }
+
+      const recommendedAction = getRecommendedAction(exc.playbookType, nextLevel);
+      const nextFollowUpAt = computeNextFollowUp(exc.severity);
+
+      setExceptions((prev) =>
+        prev.map((e) =>
+          e.id === id
+            ? touch({
+                ...e,
+                escalationLevel: nextLevel,
+                recommendedAction,
+                nextFollowUpAt,
+                status: "Escalated",
+              })
+            : e,
+        ),
+      );
+      setActivity((act) => [
+        {
+          time: formatNowLabel(),
+          actor: CURRENT_USER,
+          event: `${CURRENT_USER} escalated exception on ${exc.shipmentId} to ${formatEscalationLevel(nextLevel)}`,
+          shipmentId: exc.shipmentId,
+          type: "escalation",
+        },
+        ...act,
+      ]);
+    },
+    [persistToSupabase, organizationId, requireDbId, refreshAfterMutation, getById],
+  );
+
   const syncCarriers = useCallback(
     async (carrierFilter?: CarrierKey): Promise<OrganizationSyncResult> => {
       const shipmentsForCarrier = carrierFilter
@@ -610,6 +738,13 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
             event: `Carrier exception detected on ${shipment.id} — ${record.title}`,
             shipmentId: shipment.id,
             type: "alert",
+          },
+          {
+            time: formatNowLabel(),
+            actor: "System",
+            event: `Playbook assigned — ${record.playbookType} (Level 1: Operations Review) · Owner: ${record.owner}`,
+            shipmentId: shipment.id,
+            type: "action",
           },
           {
             time: formatNowLabel(),
@@ -723,6 +858,8 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       deleteNote,
       resolveException,
       deleteException,
+      completeFollowUp,
+      escalatePlaybook,
       syncCarriers,
       simulateCarrierException: simulateCarrierExceptionAction,
     }),
@@ -749,6 +886,8 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       deleteNote,
       resolveException,
       deleteException,
+      completeFollowUp,
+      escalatePlaybook,
       syncCarriers,
       simulateCarrierExceptionAction,
     ],
