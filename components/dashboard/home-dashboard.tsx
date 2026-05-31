@@ -2,6 +2,7 @@
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { AutoDetectedAlertsPanel } from "@/components/dashboard/auto-detected-alerts";
+import { CarrierExceptionsPanel } from "@/components/dashboard/carrier-exceptions-panel";
 import { HomeDashboardActions } from "@/components/dashboard/home-dashboard-actions";
 import { MetricsGrid } from "@/components/dashboard/metrics-grid";
 import { RecentActivityPanel } from "@/components/dashboard/recent-activity-panel";
@@ -40,6 +41,8 @@ export function HomeDashboard() {
         <MetricsGrid />
 
         <AutoDetectedAlertsPanel />
+
+        <CarrierExceptionsPanel />
 
         {atRiskCustomers.length > 0 && (
           <section aria-label="Customers at risk">

@@ -27,8 +27,16 @@ export const CARRIER_DISPLAY_NAMES: Record<CarrierKey, string> = {
 
 /** Maps shipment carrier text to a registered provider key. */
 export function resolveCarrierKey(carrierName: string): CarrierKey | null {
-  const normalized = carrierName.toLowerCase();
-  if (normalized.includes("ups")) return "ups";
+  const normalized = carrierName.trim().toLowerCase();
+  if (!normalized) return null;
+
+  for (const [key, displayName] of Object.entries(CARRIER_DISPLAY_NAMES)) {
+    if (normalized === displayName.toLowerCase()) {
+      return key as CarrierKey;
+    }
+  }
+
+  if (normalized.includes("ups") || normalized.includes("united parcel")) return "ups";
   if (normalized.includes("fedex")) return "fedex";
   if (normalized.includes("xpo")) return "xpo";
   if (normalized.includes("old dominion") || normalized.includes("odfl")) return "odfl";

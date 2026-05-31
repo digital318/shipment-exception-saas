@@ -127,6 +127,7 @@ CREATE TABLE public.exceptions (
   delay_reason        text,
   resolution_summary  text,
   resolved_at         timestamptz,
+  source              text NOT NULL DEFAULT 'manual',
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now()
 );
@@ -145,6 +146,9 @@ COMMENT ON COLUMN public.exceptions.owner IS
 
 COMMENT ON COLUMN public.exceptions.resolved_at IS
   'Timestamp when the exception was closed; NULL while still open.';
+
+COMMENT ON COLUMN public.exceptions.source IS
+  'Origin: manual (user or SLA auto-detect) or carrier_sync (carrier API exception status).';
 
 CREATE INDEX idx_exceptions_shipment_id ON public.exceptions (shipment_id);
 CREATE INDEX idx_exceptions_status ON public.exceptions (status);

@@ -76,6 +76,20 @@ export function buildResolutionNotificationInput(
   };
 }
 
+export function buildCarrierExceptionNotificationInput(
+  organizationId: string,
+  ctx: ExceptionNotificationContext,
+): CreateNotificationInput {
+  return {
+    organizationId,
+    type: "exception_high",
+    title: "Carrier Exception Detected",
+    message: `${ctx.title} · ${ctx.shipmentNumber}`,
+    severity: "High",
+    exceptionId: ctx.exceptionId,
+  };
+}
+
 export function isEscalationNotification(type: NotificationType): boolean {
   return type === "exception_critical" || type === "exception_high" || type === "sla_risk";
 }

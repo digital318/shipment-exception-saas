@@ -12,7 +12,11 @@ import { useExceptions } from "@/context/exceptions-context";
 import { useToast } from "@/context/toast-context";
 import { ALL_CARRIER_KEYS, CARRIER_DISPLAY_NAMES, resolveCarrierKey } from "@/lib/carriers";
 import { formatRelativeTime } from "@/lib/data/format";
-import type { OrganizationSyncResult } from "@/lib/services/carrier-sync";
+import { formatUnknownError, logSimulateExceptionError } from "@/lib/supabase/format-error";
+import type {
+  OrganizationSyncResult,
+  SimulateCarrierExceptionResult,
+} from "@/lib/services/carrier-sync";
 import type { CarrierIntegration, CarrierKey } from "@/lib/types";
 
 type CarrierContextValue = {
@@ -22,6 +26,8 @@ type CarrierContextValue = {
   lastSyncResult: OrganizationSyncResult | null;
   syncAll: () => Promise<void>;
   syncCarrier: (key: CarrierKey) => Promise<void>;
+  simulateException: (key: CarrierKey) => Promise<SimulateCarrierExceptionResult | null>;
+  simulatingKey: CarrierKey | null;
 };
 
 const CarrierContext = createContext<CarrierContextValue | null>(null);
@@ -53,10 +59,11 @@ function buildIntegrations(
 }
 
 export function CarrierProvider({ children }: { children: ReactNode }) {
-  const { shipments, syncCarriers } = useExceptions();
+  const { shipments, syncCarriers, simulateCarrierException } = useExceptions();
   const { toast } = useToast();
 
   const [syncing, setSyncing] = useState(false);
+  const [simulatingKey, setSimulatingKey] = useState<CarrierKey | null>(null);
   const [lastOrgSyncAt, setLastOrgSyncAt] = useState<string | null>(null);
   const [lastSyncResult, setLastSyncResult] = useState<OrganizationSyncResult | null>(null);
   const [syncMeta, setSyncMeta] = useState<
@@ -74,6 +81,12 @@ export function CarrierProvider({ children }: { children: ReactNode }) {
 
   const runSync = useCallback(
     async (carrierFilter?: CarrierKey) => {
+      console.info("[CarrierSync] runSync START (Sync button on /carriers)", {
+        carrierKey: carrierFilter ?? "all",
+        entrypoint: carrierFilter ? "syncCarrier" : "syncAll",
+        nextCall: "syncCarriers",
+      });
+
       setSyncing(true);
       if (carrierFilter) {
         setSyncMeta((prev) => ({
@@ -91,7 +104,17 @@ export function CarrierProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        console.info("[CarrierSync] runSync calling syncCarriers", {
+          carrierKey: carrierFilter ?? "all",
+        });
         const result = await syncCarriers(carrierFilter);
+        console.info("[CarrierSync] runSync syncCarriers returned", {
+          carrierKey: carrierFilter ?? "all",
+          synced: result.synced,
+          skipped: result.skipped,
+          exceptionsCreated: result.exceptionsCreated,
+          resultCount: result.results.length,
+        });
         setLastSyncResult(result);
         setLastOrgSyncAt(result.syncedAt);
 
@@ -118,6 +141,11 @@ export function CarrierProvider({ children }: { children: ReactNode }) {
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Carrier sync failed.";
+        console.error("[CarrierSync] runSync FAILED", {
+          carrierKey: carrierFilter ?? "all",
+          error: message,
+          raw: err,
+        });
         if (carrierFilter) {
           setSyncMeta((prev) => ({
             ...prev,
@@ -143,6 +171,28 @@ export function CarrierProvider({ children }: { children: ReactNode }) {
   const syncAll = useCallback(() => runSync(), [runSync]);
   const syncCarrier = useCallback((key: CarrierKey) => runSync(key), [runSync]);
 
+  const simulateException = useCallback(
+    async (key: CarrierKey): Promise<SimulateCarrierExceptionResult | null> => {
+      setSimulatingKey(key);
+      try {
+        const result = await simulateCarrierException(key);
+        toast(
+          `${CARRIER_DISPLAY_NAMES[key]}: simulated exception on ${result.shipmentId}${result.exceptionCreated ? "" : " (shipment updated, existing exception kept)"}`,
+          result.exceptionCreated ? "info" : "success",
+        );
+        return result;
+      } catch (err) {
+        logSimulateExceptionError(`carriers-page carrier=${key}`, err);
+        const message = formatUnknownError(err);
+        toast(message, "error");
+        return null;
+      } finally {
+        setSimulatingKey(null);
+      }
+    },
+    [simulateCarrierException, toast],
+  );
+
   return (
     <CarrierContext.Provider
       value={{
@@ -152,6 +202,8 @@ export function CarrierProvider({ children }: { children: ReactNode }) {
         lastSyncResult,
         syncAll,
         syncCarrier,
+        simulateException,
+        simulatingKey,
       }}
     >
       {children}

@@ -35,10 +35,12 @@ export function CarriersPage() {
   const {
     integrations,
     syncing,
+    simulatingKey,
     lastOrgSyncAt,
     lastSyncResult,
     syncAll,
     syncCarrier,
+    simulateException,
   } = useCarriers();
 
   const totalMonitored = integrations.reduce((sum, c) => sum + c.shipmentsMonitored, 0);
@@ -153,14 +155,28 @@ export function CarriersPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => void syncCarrier(carrier.key)}
-                        disabled={syncing || carrier.shipmentsMonitored === 0}
-                        className={`${btnSecondary}${syncing || carrier.shipmentsMonitored === 0 ? ` ${btnDisabled}` : ""}`}
-                      >
-                        Sync
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void simulateException(carrier.key)}
+                          disabled={
+                            syncing ||
+                            simulatingKey !== null ||
+                            carrier.shipmentsMonitored === 0
+                          }
+                          className={`${btnSecondary}${syncing || simulatingKey !== null || carrier.shipmentsMonitored === 0 ? ` ${btnDisabled}` : ""}`}
+                        >
+                          {simulatingKey === carrier.key ? "Simulating…" : "Simulate Exception"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void syncCarrier(carrier.key)}
+                          disabled={syncing || simulatingKey !== null || carrier.shipmentsMonitored === 0}
+                          className={`${btnSecondary}${syncing || simulatingKey !== null || carrier.shipmentsMonitored === 0 ? ` ${btnDisabled}` : ""}`}
+                        >
+                          Sync
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

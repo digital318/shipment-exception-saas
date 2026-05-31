@@ -39,11 +39,17 @@ import {
 import { toAutoDetectedAlert, type AutoDetectedAlert } from "@/lib/exception-engine";
 import { notificationTypeForSeverity } from "@/lib/data/notification-rules";
 import {
+  applySimulatedExceptionToShipment,
   applySyncResultToShipment,
   buildMockExceptionFromSync,
+  buildMockSimulatedException,
+  simulateCarrierException,
   syncOrganizationShipments,
   type OrganizationSyncResult,
+  type SimulateCarrierExceptionResult,
 } from "@/lib/services/carrier-sync";
+import { resolveCarrierKey } from "@/lib/carriers";
+import { formatUnknownError, logSimulateExceptionError } from "@/lib/supabase/format-error";
 import type { CarrierKey } from "@/lib/types";
 import type {
   ActivityItem,
@@ -83,6 +89,7 @@ type ExceptionsContextValue = {
   resolveException: (id: string) => Promise<void>;
   deleteException: (id: string) => Promise<void>;
   syncCarriers: (carrierFilter?: CarrierKey) => Promise<OrganizationSyncResult>;
+  simulateCarrierException: (carrierKey: CarrierKey) => Promise<SimulateCarrierExceptionResult>;
 };
 
 const ExceptionsContext = createContext<ExceptionsContextValue | null>(null);
@@ -242,8 +249,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     [exceptions],
   );
 
-  const persistToSupabase =
-    source === "supabase" && isSupabaseWriteEnabled() && !!organization?.id;
+  const persistToSupabase = isSupabaseWriteEnabled() && !!organizationId;
 
   const requireDbId = useCallback(
     (id: string): ExceptionRecord => {
@@ -303,6 +309,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         delayReason: input.delayReason.trim(),
         openedAt: formatOpenedAt(),
         updatedAt: formatNowLabel(),
+        source: "Manual",
         internalNotes: [],
       };
 
@@ -521,6 +528,32 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
 
   const syncCarriers = useCallback(
     async (carrierFilter?: CarrierKey): Promise<OrganizationSyncResult> => {
+      const shipmentsForCarrier = carrierFilter
+        ? shipments.filter((s) => {
+            if (s.status === "Delivered") return false;
+            return resolveCarrierKey(s.carrier) === carrierFilter;
+          })
+        : shipments.filter((s) => s.status !== "Delivered" && resolveCarrierKey(s.carrier));
+
+      console.info("[CarrierSync] syncCarriers START", {
+        carrierKey: carrierFilter ?? "all",
+        organizationId: organizationId ?? null,
+        persistToSupabase,
+        dataSource: source,
+        totalShipments: shipments.length,
+        shipmentsForCarrier: shipmentsForCarrier.map((s) => ({
+          id: s.id,
+          carrier: s.carrier,
+          resolvedKey: resolveCarrierKey(s.carrier),
+          status: s.status,
+        })),
+      });
+
+      console.info("[CarrierSync] syncCarriers calling syncOrganizationShipments", {
+        carrierKey: carrierFilter ?? "all",
+        organizationId: persistToSupabase ? organizationId : null,
+      });
+
       const result = await syncOrganizationShipments(
         shipments,
         persistToSupabase ? organizationId : undefined,
@@ -528,7 +561,22 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         carrierFilter,
       );
 
+      console.info("[CarrierSync] syncCarriers syncOrganizationShipments returned", {
+        carrierKey: carrierFilter ?? "all",
+        synced: result.synced,
+        skipped: result.skipped,
+        exceptionsCreated: result.exceptionsCreated,
+        results: result.results.map((r) => ({
+          shipmentNumber: r.shipmentNumber,
+          skipped: r.skipped,
+          skipReason: r.skipReason,
+          carrierStatus: r.carrierStatus,
+          exceptionCreated: r.exceptionCreated,
+        })),
+      });
+
       if (persistToSupabase) {
+        console.info("[CarrierSync] syncCarriers reloading data from Supabase");
         await loadData({ silent: true });
         return result;
       }
@@ -559,14 +607,14 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
           {
             time: formatNowLabel(),
             actor: "Carrier API",
-            event: `Auto-detected High exception on ${shipment.id} — ${record.title}`,
+            event: `Carrier exception detected on ${shipment.id} — ${record.title}`,
             shipmentId: shipment.id,
-            type: "escalation",
+            type: "alert",
           },
           {
             time: formatNowLabel(),
             actor: "System",
-            event: `Notification: High exception — ${shipment.id}`,
+            event: "Notification: Carrier Exception Detected",
             shipmentId: shipment.id,
             type: "alert",
           },
@@ -581,6 +629,70 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       }
 
       return result;
+    },
+    [shipments, exceptions, persistToSupabase, organizationId, loadData],
+  );
+
+  const simulateCarrierExceptionAction = useCallback(
+    async (carrierKey: CarrierKey): Promise<SimulateCarrierExceptionResult> => {
+      try {
+        const result = await simulateCarrierException(
+          shipments,
+          exceptions,
+          carrierKey,
+          persistToSupabase ? organizationId : undefined,
+        );
+
+        if (result.skippedReason) {
+          throw new Error(result.skippedReason);
+        }
+
+        if (persistToSupabase) {
+          await loadData({ silent: true });
+          return result;
+        }
+
+        const shipment = shipments.find((s) => s.id === result.shipmentId);
+        if (!shipment) return result;
+
+        const lastCarrierUpdate = new Date().toISOString();
+        setShipments((prev) =>
+          prev.map((s) =>
+            s.id === result.shipmentId
+              ? applySimulatedExceptionToShipment(s, lastCarrierUpdate)
+              : s,
+          ),
+        );
+
+        if (result.exceptionCreated) {
+          const record = buildMockSimulatedException(shipment, exceptions);
+          if (record) {
+            setExceptions((prev) => [record, ...prev]);
+            setActivity((act) => [
+              {
+                time: formatNowLabel(),
+                actor: "System",
+                event: `Carrier exception detected on ${shipment.id} — ${record.title}`,
+                shipmentId: shipment.id,
+                type: "alert",
+              },
+              {
+                time: formatNowLabel(),
+                actor: "System",
+                event: "Notification: Carrier Exception Detected",
+                shipmentId: shipment.id,
+                type: "alert",
+              },
+              ...act,
+            ]);
+          }
+        }
+
+        return result;
+      } catch (error) {
+        logSimulateExceptionError("exceptions-context.simulateCarrierException", error);
+        throw error instanceof Error ? error : new Error(formatUnknownError(error));
+      }
     },
     [shipments, exceptions, persistToSupabase, organizationId, loadData],
   );
@@ -612,6 +724,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       resolveException,
       deleteException,
       syncCarriers,
+      simulateCarrierException: simulateCarrierExceptionAction,
     }),
     [
       shipments,
@@ -637,6 +750,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       resolveException,
       deleteException,
       syncCarriers,
+      simulateCarrierExceptionAction,
     ],
   );
 

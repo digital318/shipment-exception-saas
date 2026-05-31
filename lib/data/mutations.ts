@@ -1,5 +1,6 @@
 import { CURRENT_USER, DEFAULT_AUTO_EXCEPTION_OWNER } from "@/lib/constants";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
+import { throwReadableError } from "@/lib/supabase/format-error";
 import type {
   CreateExceptionInput,
   IssueStatus,
@@ -7,6 +8,7 @@ import type {
   UpdateExceptionInput,
 } from "@/lib/types";
 import {
+  buildCarrierExceptionNotificationInput,
   buildExceptionNotificationInput,
   buildResolutionNotificationInput,
 } from "./notification-rules";
@@ -31,7 +33,7 @@ async function lookupShipmentUuid(
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) throwReadableError(error);
   return data?.id ?? null;
 }
 
@@ -49,7 +51,7 @@ async function insertActivityEvent(
     message,
   });
 
-  if (error) throw error;
+  if (error) throwReadableError(error);
 }
 
 async function notifyExceptionCreated(
@@ -120,6 +122,7 @@ export async function createExceptionInSupabase(
       status: input.status ?? "Open",
       owner: input.owner,
       delay_reason: input.delayReason.trim(),
+      source: "manual",
     })
     .select("id")
     .single();
@@ -168,6 +171,7 @@ export async function createAutoDetectedExceptionInSupabase(
       status: "Open",
       owner,
       delay_reason: input.delayReason.trim(),
+      source: "manual",
     })
     .select("id")
     .single();
@@ -188,6 +192,60 @@ export async function createAutoDetectedExceptionInSupabase(
     input.title.trim(),
     input.severity,
   );
+
+  return data.id;
+}
+
+export async function createCarrierSyncExceptionInSupabase(
+  input: {
+    shipmentUuid: string;
+    shipmentNumber: string;
+    title: string;
+    severity: Severity;
+    delayReason: string;
+    owner?: string;
+  },
+  organizationId: string,
+): Promise<string> {
+  const supabase = getSupabaseClient();
+  const owner = input.owner ?? DEFAULT_AUTO_EXCEPTION_OWNER;
+
+  const { data, error } = await supabase
+    .from("exceptions")
+    .insert({
+      shipment_id: input.shipmentUuid,
+      organization_id: organizationId,
+      title: input.title.trim(),
+      severity: input.severity,
+      status: "Open",
+      owner,
+      delay_reason: input.delayReason.trim(),
+      source: "carrier_sync",
+    })
+    .select("id")
+    .single();
+
+  if (error) throwReadableError(error);
+
+  await insertActivityEvent(
+    data.id,
+    organizationId,
+    "alert",
+    `Carrier exception detected on ${input.shipmentNumber} — ${input.title.trim()}`,
+  );
+
+  const notificationInput = buildCarrierExceptionNotificationInput(organizationId, {
+    exceptionId: data.id,
+    shipmentNumber: input.shipmentNumber,
+    title: input.title.trim(),
+    severity: input.severity,
+  });
+
+  try {
+    await createNotification(notificationInput);
+  } catch {
+    // Notification failure should not block carrier sync.
+  }
 
   return data.id;
 }

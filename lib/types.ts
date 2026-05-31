@@ -38,6 +38,9 @@ export type IssueStatus =
   | "Awaiting Carrier"
   | "Resolved";
 
+/** How the exception was created — shown in the detail drawer and carrier widget. */
+export type ExceptionSource = "Manual" | "Carrier Sync";
+
 export type Shipment = {
   id: string;
   customer: string;
@@ -84,6 +87,8 @@ export type ExceptionRecord = {
   openedAt: string;
   updatedAt: string;
   resolvedAt?: string;
+  /** Defaults to Manual when not set (legacy mock / SLA auto-detect). */
+  source?: ExceptionSource;
   internalNotes: InternalNote[];
 };
 

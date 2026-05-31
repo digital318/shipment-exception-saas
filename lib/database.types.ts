@@ -61,6 +61,7 @@ export type DbException = {
   delay_reason: string | null;
   resolution_summary: string | null;
   resolved_at: string | null;
+  source: string;
   created_at: string;
   updated_at: string;
 };

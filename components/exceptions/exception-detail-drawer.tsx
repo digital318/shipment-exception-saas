@@ -252,6 +252,7 @@ function ExceptionEditView({
         <Row label="Customer" value={exc.customer} />
         <Row label="Carrier" value={exc.carrier} />
         <Row label="Route" value={exc.route} />
+        <Row label="Origin" value={exc.source ?? "Manual"} />
         <Row label="Delay reason" value={exc.delayReason} />
         <Row label="Opened" value={exc.openedAt} />
         <Row label="Updated" value={exc.updatedAt} />

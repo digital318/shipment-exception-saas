@@ -224,6 +224,7 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     delayReason: "Driver HOS reset — mandatory 10-hr break",
     openedAt: "May 27, 2026 · 08:12",
     updatedAt: "5 min ago",
+    source: "Manual",
     internalNotes: [
       {
         id: "note-1",
@@ -246,6 +247,7 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     delayReason: "Port congestion — chassis shortage at LBCT",
     openedAt: "May 26, 2026 · 19:40",
     updatedAt: "22 min ago",
+    source: "Manual",
     internalNotes: [],
   },
   {
@@ -261,6 +263,7 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     delayReason: "Missed linehaul connection at Nashville hub",
     openedAt: "May 27, 2026 · 06:30",
     updatedAt: "1 hr ago",
+    source: "Manual",
     internalNotes: [],
   },
   {
@@ -276,6 +279,7 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     delayReason: "Severe weather — I-10 corridor closure",
     openedAt: "May 27, 2026 · 04:15",
     updatedAt: "34 min ago",
+    source: "Manual",
     internalNotes: [],
   },
   {
@@ -291,6 +295,7 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     delayReason: "Address verification — suite number mismatch",
     openedAt: "May 27, 2026 · 09:00",
     updatedAt: "18 min ago",
+    source: "Manual",
     internalNotes: [],
   },
   {
@@ -306,6 +311,7 @@ export const initialExceptionRecords: ExceptionRecord[] = [
     delayReason: "Terminal congestion — outbound dock delay",
     openedAt: "May 27, 2026 · 11:20",
     updatedAt: "2 hr ago",
+    source: "Manual",
     internalNotes: [],
   },
 ];

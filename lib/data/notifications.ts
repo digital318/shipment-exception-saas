@@ -2,7 +2,6 @@ import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import type { DbNotificationWithRelations } from "@/lib/database.types";
 import type { CreateNotificationInput, NotificationRecord } from "@/lib/types";
 import type { CustomerSlaMetrics } from "@/lib/sla-intelligence";
-import { buildSlaRiskNotificationInput } from "./notification-rules";
 import { mapNotifications } from "./notification-mappers";
 import { resolveOrganizationId } from "./resolve-organization-id";
 import type { DataResult } from "./types";
@@ -200,7 +199,44 @@ export async function hasUnreadSlaNotificationForCustomer(
     .eq("status", "Unread")
     .limit(1);
 
-  if (error) return false;
+  if (error) {
+    console.error("[FreightPulse] hasUnreadSlaNotificationForCustomer failed", {
+      organizationId,
+      customerId,
+      message: error.message,
+      code: error.code,
+    });
+    throw error;
+  }
+
+  return (data?.length ?? 0) > 0;
+}
+
+export async function hasAnySlaRiskNotificationForCustomer(
+  organizationId: string,
+  customerId: string,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .eq("type", "sla_risk")
+    .limit(1);
+
+  if (error) {
+    console.error("[FreightPulse] hasAnySlaRiskNotificationForCustomer failed", {
+      organizationId,
+      customerId,
+      message: error.message,
+      code: error.code,
+    });
+    throw error;
+  }
+
   return (data?.length ?? 0) > 0;
 }
 
@@ -234,42 +270,17 @@ export async function findOpenExceptionForCustomer(
   return data.id;
 }
 
-/**
- * Creates SLA risk notifications for red-risk customers without an existing unread alert.
- */
+/** @deprecated Use processSlaRiskNotificationTransitions — kept for import compatibility. */
 export async function syncSlaRiskNotifications(
   organizationId: string,
   atRiskCustomers: CustomerSlaMetrics[],
 ): Promise<number> {
-  if (!isSupabaseConfigured()) return 0;
-
-  let created = 0;
-
-  for (const customer of atRiskCustomers.filter((c) => c.riskLevel === "red")) {
-    const alreadyNotified = await hasUnreadSlaNotificationForCustomer(
-      organizationId,
-      customer.customerId,
-    );
-    if (alreadyNotified) continue;
-
-    const exceptionId =
-      (await findOpenExceptionForCustomer(organizationId, customer.customerId)) ?? undefined;
-
-    const input = buildSlaRiskNotificationInput(organizationId, {
-      customerId: customer.customerId,
-      customerName: customer.customerName,
-      onTimePercent: customer.onTimePercent,
-      slaTarget: customer.slaTarget,
-      exceptionId,
-    });
-
-    try {
-      await createEscalationNotification(input);
-      created += 1;
-    } catch {
-      // Continue syncing remaining customers.
-    }
-  }
-
-  return created;
+  const redCustomers = atRiskCustomers.filter((c) => c.riskLevel === "red");
+  const { processSlaRiskNotificationTransitions } = await import("./sla-risk-notifications");
+  const { result } = await processSlaRiskNotificationTransitions(
+    organizationId,
+    redCustomers,
+    new Map(),
+  );
+  return result.created;
 }

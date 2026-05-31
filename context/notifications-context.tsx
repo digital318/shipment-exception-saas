@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -18,9 +19,10 @@ import {
   getNotificationsForOrganization,
   markAllNotificationsRead,
   markNotificationRead,
-  syncSlaRiskNotifications,
 } from "@/lib/data/notifications";
+import { processSlaRiskNotificationTransitions, buildRiskSnapshot } from "@/lib/data/sla-risk-notifications";
 import { isEscalationNotification } from "@/lib/data/notification-rules";
+import type { RiskLevel } from "@/lib/sla-intelligence";
 import { countUnreadNotifications } from "@/lib/notifications-utils";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { DataSource } from "@/lib/data/types";
@@ -37,6 +39,8 @@ type NotificationsContextValue = {
   error: string | null;
   source: DataSource;
   refresh: () => Promise<void>;
+  /** Reload notifications only — does not refresh exceptions/shipments. */
+  refreshNotifications: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
   escalationNotifications: NotificationRecord[];
@@ -91,6 +95,27 @@ function buildMockNotifications(
 
   for (const customer of atRiskCustomers.filter((c) => c.riskLevel === "red")) {
     const id = `mock-sla-${customer.customerId}`;
+    if (readIds.has(id)) {
+      items.push({
+        id,
+        organizationId: "mock",
+        customerId: customer.customerId,
+        type: "sla_risk",
+        title: `SLA risk — ${customer.customerName}`,
+        message: `On-time delivery at ${customer.onTimePercent.toFixed(1)}% vs ${customer.slaTarget}% target.`,
+        severity: "Critical",
+        status: "Read",
+        createdAt: "Just now",
+        customerName: customer.customerName,
+      });
+      continue;
+    }
+
+    const alreadyUnread = items.some(
+      (n) => n.type === "sla_risk" && n.customerId === customer.customerId && n.status === "Unread",
+    );
+    if (alreadyUnread) continue;
+
     items.push({
       id,
       organizationId: "mock",
@@ -112,7 +137,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { organization, profile, loading: orgLoading, needsOnboarding } = useOrganization();
   const { exceptions, refresh: refreshExceptions } = useExceptions();
-  const { atRiskCustomers } = useSlaIntelligence();
+  const { atRiskCustomers, customerMetrics } = useSlaIntelligence();
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [mockReadIds, setMockReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -121,9 +146,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const organizationId = organization?.id ?? profile?.organizationId ?? undefined;
   const useSupabase = isSupabaseConfigured();
+  const previousRiskByCustomerRef = useRef<Map<string, RiskLevel>>(new Map());
+  const lastRiskSnapshotRef = useRef("");
+  const slaTransitionInFlightRef = useRef(false);
+  const loadNotificationsRef = useRef<(() => Promise<void>) | null>(null);
 
-  const loadNotifications = useCallback(
-    async (options?: { skipSlaSync?: boolean }) => {
+  const loadNotifications = useCallback(async () => {
       if (!useSupabase || !organizationId) {
         setNotifications([]);
         setSource("mock");
@@ -134,13 +162,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
       setLoading(true);
       setError(null);
-      setNotifications([]);
 
       try {
-        if (!options?.skipSlaSync && !needsOnboarding) {
-          await syncSlaRiskNotifications(organizationId, atRiskCustomers);
-        }
-
         const result = await getNotificationsForOrganization(organizationId);
 
         if (result.source === "supabase") {
@@ -160,8 +183,42 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [useSupabase, organizationId, atRiskCustomers, needsOnboarding],
+    [useSupabase, organizationId],
   );
+
+  loadNotificationsRef.current = loadNotifications;
+
+  useEffect(() => {
+    if (orgLoading || needsOnboarding || !useSupabase || !organizationId) return;
+    if (customerMetrics.length === 0) return;
+
+    const snapshot = buildRiskSnapshot(customerMetrics);
+    if (snapshot === lastRiskSnapshotRef.current) return;
+    if (slaTransitionInFlightRef.current) return;
+
+    slaTransitionInFlightRef.current = true;
+    lastRiskSnapshotRef.current = snapshot;
+
+    void processSlaRiskNotificationTransitions(
+      organizationId,
+      customerMetrics,
+      previousRiskByCustomerRef.current,
+    )
+      .then(async ({ result, nextRiskByCustomer, riskSnapshot }) => {
+        previousRiskByCustomerRef.current = nextRiskByCustomer;
+        lastRiskSnapshotRef.current = riskSnapshot;
+        if (result.created > 0) {
+          await loadNotificationsRef.current?.();
+        }
+      })
+      .catch((err) => {
+        console.error("[FreightPulse] SLA risk transition processing failed", err);
+        lastRiskSnapshotRef.current = "";
+      })
+      .finally(() => {
+        slaTransitionInFlightRef.current = false;
+      });
+  }, [customerMetrics, orgLoading, needsOnboarding, useSupabase, organizationId]);
 
   useEffect(() => {
     if (orgLoading) return;
@@ -172,7 +229,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    void loadNotifications({ skipSlaSync: true });
+    void loadNotifications();
   }, [loadNotifications, orgLoading, useSupabase, organizationId, pathname]);
 
   const mockNotifications = useMemo(
@@ -204,7 +261,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (useSupabase && organizationId) {
         await markNotificationRead(id, organizationId);
-        await loadNotifications({ skipSlaSync: true });
+        await loadNotifications();
         return;
       }
 
@@ -232,7 +289,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     try {
       await markAllNotificationsRead(organizationId);
-      await loadNotifications({ skipSlaSync: true });
+      await loadNotifications();
     } catch (err) {
       const supabaseError =
         err && typeof err === "object" && "message" in err
@@ -263,6 +320,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     loadNotifications,
   ]);
 
+  const refreshNotifications = useCallback(async () => {
+    await loadNotifications();
+  }, [loadNotifications]);
+
   const refresh = useCallback(async () => {
     await refreshExceptions();
     await loadNotifications();
@@ -276,6 +337,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       error,
       source,
       refresh,
+      refreshNotifications,
       markRead,
       markAllRead,
       escalationNotifications,
@@ -287,6 +349,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       error,
       source,
       refresh,
+      refreshNotifications,
       markRead,
       markAllRead,
       escalationNotifications,

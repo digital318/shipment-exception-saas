@@ -15,6 +15,7 @@ import type {
   Severity,
   Shipment,
   ShipmentStatus,
+  ExceptionSource,
 } from "@/lib/types";
 import { generateTrackingNumber, resolveCarrierKey } from "@/lib/carriers";
 import { formatDisplayDate, formatRelativeTime, subtractHours } from "./format";
@@ -120,6 +121,11 @@ export function mapExceptionNote(note: {
   };
 }
 
+function mapExceptionSource(value: string | null | undefined): ExceptionSource {
+  if (value === "carrier_sync") return "Carrier Sync";
+  return "Manual";
+}
+
 export function mapExceptionRecord(
   row: DbExceptionWithRelations,
   displayId: string,
@@ -146,6 +152,7 @@ export function mapExceptionRecord(
     openedAt: formatDisplayDate(row.created_at),
     updatedAt: formatRelativeTime(row.updated_at),
     resolvedAt: row.resolved_at ? formatDisplayDate(row.resolved_at) : undefined,
+    source: mapExceptionSource(row.source),
     internalNotes: (row.exception_notes ?? [])
       .sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),

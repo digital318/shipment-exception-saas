@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IconBell } from "@/components/icons";
 import { useNotifications } from "@/context/notifications-context";
 import {
@@ -61,15 +61,34 @@ function NotificationDropdownItem({
 }
 
 export function NotificationBell() {
-  const { notifications, unreadCount, loading, error, markRead, markAllRead, refresh } =
-    useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    markRead,
+    markAllRead,
+    refreshNotifications,
+  } = useNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
+
+  const handleToggle = useCallback(() => {
+    setOpen((prev) => !prev);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
-    void refresh();
-  }, [open, refresh]);
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+
+    if (!justOpened) return;
+    void refreshNotifications();
+  }, [open, refreshNotifications]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +109,7 @@ export function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleToggle}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={open}
         className={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 transition hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/30 ${
@@ -130,18 +149,18 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-[min(60vh,420px)] divide-y divide-white/[0.04] overflow-y-auto">
-            {loading ? (
+            {loading && recent.length === 0 ? (
               <div className="px-4 py-10 text-center">
                 <span className="mx-auto block h-6 w-6 animate-spin rounded-full border-2 border-violet-400/30 border-t-violet-400" />
                 <p className="mt-3 text-sm text-zinc-400">Loading notifications…</p>
               </div>
-            ) : error ? (
+            ) : error && recent.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <p className="text-sm font-medium text-rose-300">Could not load</p>
                 <p className="mt-1 text-xs text-zinc-500">{error}</p>
                 <button
                   type="button"
-                  onClick={() => void refresh()}
+                  onClick={() => void refreshNotifications()}
                   className="mt-4 text-xs font-medium text-violet-400 transition hover:text-violet-300"
                 >
                   Try again
@@ -168,14 +187,14 @@ export function NotificationBell() {
           <div className="space-y-2 border-t border-white/[0.06] p-3">
             <Link
               href="/notifications"
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               className={`block w-full text-center ${btnSecondary}`}
             >
               Notification center
             </Link>
             <Link
               href="/escalations"
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               className={`block w-full text-center ${btnSecondary} !border-transparent !bg-transparent text-zinc-500 hover:!text-zinc-300`}
             >
               View escalations

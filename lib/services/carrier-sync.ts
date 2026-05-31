@@ -8,6 +8,11 @@ import {
 } from "@/lib/carriers";
 import { formatDisplayDate } from "@/lib/data/format";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
+import {
+  formatUnknownError,
+  logSimulateExceptionError,
+  throwReadableError,
+} from "@/lib/supabase/format-error";
 import type {
   CarrierKey,
   CarrierShipmentEvent,
@@ -16,13 +21,7 @@ import type {
   Shipment,
   ShipmentStatus,
 } from "@/lib/types";
-import {
-  buildExceptionNotificationInput,
-} from "@/lib/data/notification-rules";
-import {
-  createAutoDetectedExceptionInSupabase,
-} from "@/lib/data/mutations";
-import { createNotification } from "@/lib/data/notifications";
+import { createCarrierSyncExceptionInSupabase } from "@/lib/data/mutations";
 
 export type ShipmentSyncInput = {
   shipmentNumber: string;
@@ -72,27 +71,42 @@ function resolveTrackingNumber(input: ShipmentSyncInput): string | null {
   return generateTrackingNumber(input.shipmentNumber, key);
 }
 
+function hasActiveCarrierException(
+  exceptions: ExceptionRecord[],
+  shipmentId: string,
+): ExceptionRecord | undefined {
+  return exceptions.find(
+    (e) =>
+      e.shipmentId === shipmentId &&
+      e.status !== "Resolved" &&
+      e.source === "Carrier Sync",
+  );
+}
+
 export async function createExceptionsFromCarrierEvents(
   input: ShipmentSyncInput,
+  carrierStatus: CarrierStatus,
   events: CarrierShipmentEvent[],
   previousCarrierStatus: CarrierStatus | null,
   organizationId?: string,
-  existingException?: ExceptionRecord,
+  existingCarrierException?: ExceptionRecord,
 ): Promise<CarrierExceptionResult> {
-  const latestEvent = events[0];
-  if (!latestEvent || latestEvent.status !== "Exception") {
+  if (carrierStatus !== "Exception") {
     return { exceptionCreated: false };
   }
 
-  if (previousCarrierStatus === "Exception" || existingException) {
+  if (previousCarrierStatus === "Exception" || existingCarrierException) {
     return { exceptionCreated: false };
   }
 
-  const title = `Carrier exception — ${latestEvent.description}`;
-  const delayReason = latestEvent.description;
+  const latestEvent = events.find((e) => e.status === "Exception") ?? events[0];
+  const description =
+    latestEvent?.description ?? "Carrier reported exception on shipment";
+  const title = `Carrier exception — ${description}`;
+  const delayReason = description;
 
   if (organizationId && isSupabaseConfigured() && input.shipmentUuid) {
-    const exceptionId = await createAutoDetectedExceptionInSupabase(
+    const exceptionId = await createCarrierSyncExceptionInSupabase(
       {
         shipmentUuid: input.shipmentUuid,
         shipmentNumber: input.shipmentNumber,
@@ -112,12 +126,26 @@ export async function createExceptionsFromCarrierEvents(
 export async function syncShipment(
   input: ShipmentSyncInput,
   organizationId?: string,
-  existingException?: ExceptionRecord,
+  existingCarrierException?: ExceptionRecord,
 ): Promise<ShipmentSyncResult> {
+  console.info("[CarrierSync] syncShipment START", {
+    shipmentNumber: input.shipmentNumber,
+    carrier: input.carrier,
+    resolvedCarrierKey: resolveCarrierKey(input.carrier),
+    organizationId: organizationId ?? null,
+    currentCarrierStatus: input.currentCarrierStatus ?? null,
+  });
+
   const provider = getCarrierProviderForName(input.carrier);
   const trackingNumber = resolveTrackingNumber(input);
 
   if (!provider || !trackingNumber) {
+    console.warn("[CarrierSync] syncShipment SKIPPED", {
+      shipmentNumber: input.shipmentNumber,
+      carrier: input.carrier,
+      resolvedCarrierKey: resolveCarrierKey(input.carrier),
+      skipReason: !provider ? "No carrier provider configured" : "Missing tracking number",
+    });
     return {
       shipmentNumber: input.shipmentNumber,
       carrier: input.carrier,
@@ -146,29 +174,45 @@ export async function syncShipment(
   let shipmentUuid = input.shipmentUuid;
   if (!shipmentUuid && organizationId && isSupabaseConfigured()) {
     shipmentUuid = (await lookupShipmentUuid(input.shipmentNumber, organizationId)) ?? undefined;
+    console.info("[CarrierSync] lookupShipmentUuid", {
+      shipmentNumber: input.shipmentNumber,
+      organizationId,
+      shipmentUuid: shipmentUuid ?? null,
+    });
   }
 
   const exceptionResult = await createExceptionsFromCarrierEvents(
     { ...input, shipmentUuid },
+    snapshot.status,
     snapshot.events,
     previousCarrierStatus,
     organizationId,
-    existingException,
-  );
+    existingCarrierException,
+  ).catch((err) => {
+    console.error("[CarrierSync] createExceptionsFromCarrierEvents FAILED (continuing shipment update)", {
+      shipmentNumber: input.shipmentNumber,
+      organizationId: organizationId ?? null,
+      error: err instanceof Error ? err.message : err,
+    });
+    return { exceptionCreated: false } as CarrierExceptionResult;
+  });
 
   if (organizationId && isSupabaseConfigured()) {
-    await updateShipmentCarrierFields(
-      input.shipmentNumber,
-      organizationId,
-      {
+    if (!shipmentUuid) {
+      console.warn("[CarrierSync] skipping Supabase update — shipment UUID not found", {
+        shipmentNumber: input.shipmentNumber,
+        organizationId,
+      });
+    } else {
+      await updateShipmentCarrierFields(shipmentUuid, organizationId, {
         tracking_number: trackingNumber,
         carrier_status: snapshot.status,
         last_carrier_update: snapshot.lastUpdate,
         estimated_delivery: snapshot.estimatedDelivery,
         actual_delivery: snapshot.actualDelivery,
         status: shipmentStatus,
-      },
-    );
+      });
+    }
   }
 
   return {
@@ -195,6 +239,13 @@ export async function syncOrganizationShipments(
   exceptions: ExceptionRecord[] = [],
   carrierFilter?: CarrierKey,
 ): Promise<OrganizationSyncResult> {
+  console.info("[CarrierSync] syncOrganizationShipments START", {
+    carrierKey: carrierFilter ?? "all",
+    organizationId: organizationId ?? null,
+    isSupabaseConfigured: isSupabaseConfigured(),
+    totalShipments: shipments.length,
+  });
+
   const active = shipments.filter((s) => {
     if (s.status === "Delivered") return false;
     const key = resolveCarrierKey(s.carrier);
@@ -203,12 +254,29 @@ export async function syncOrganizationShipments(
     return true;
   });
 
+  console.info("[CarrierSync] syncOrganizationShipments shipments matched", {
+    carrierKey: carrierFilter ?? "all",
+    organizationId: organizationId ?? null,
+    activeCount: active.length,
+    activeShipments: active.map((s) => ({
+      id: s.id,
+      carrier: s.carrier,
+      resolvedKey: resolveCarrierKey(s.carrier),
+      status: s.status,
+    })),
+    unmatchedCarriers: [
+      ...new Set(
+        shipments
+          .filter((s) => s.status !== "Delivered" && !resolveCarrierKey(s.carrier))
+          .map((s) => s.carrier),
+      ),
+    ],
+  });
+
   const results: ShipmentSyncResult[] = [];
 
   for (const shipment of active) {
-    const existingException = exceptions.find(
-      (e) => e.shipmentId === shipment.id && e.status !== "Resolved",
-    );
+    const existingCarrierException = hasActiveCarrierException(exceptions, shipment.id);
 
     const result = await syncShipment(
       {
@@ -219,7 +287,7 @@ export async function syncOrganizationShipments(
         currentCarrierStatus: shipment.carrierStatus,
       },
       organizationId,
-      existingException,
+      existingCarrierException,
     );
     results.push(result);
   }
@@ -234,7 +302,7 @@ export async function syncOrganizationShipments(
 }
 
 async function updateShipmentCarrierFields(
-  shipmentNumber: string,
+  shipmentUuid: string,
   organizationId: string,
   fields: {
     tracking_number: string;
@@ -246,7 +314,14 @@ async function updateShipmentCarrierFields(
   },
 ): Promise<void> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase
+
+  console.info("[CarrierSync] Supabase update BEFORE public.shipments", {
+    shipmentUuid,
+    organizationId,
+    fields,
+  });
+
+  const { data, error } = await supabase
     .from("shipments")
     .update({
       tracking_number: fields.tracking_number,
@@ -256,10 +331,38 @@ async function updateShipmentCarrierFields(
       actual_delivery: fields.actual_delivery,
       status: fields.status,
     })
-    .eq("shipment_number", shipmentNumber)
-    .eq("organization_id", organizationId);
+    .eq("id", shipmentUuid)
+    .eq("organization_id", organizationId)
+    .select(
+      "id, shipment_number, tracking_number, carrier_status, last_carrier_update, estimated_delivery, actual_delivery, status",
+    );
 
-  if (error) throw error;
+  if (error) {
+    console.error("[CarrierSync] Supabase update FAILED public.shipments", {
+      shipmentUuid,
+      organizationId,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw error;
+  }
+
+  console.info("[CarrierSync] Supabase update AFTER public.shipments", {
+    shipmentUuid,
+    organizationId,
+    rowsUpdated: data?.length ?? 0,
+    updatedRows: data,
+  });
+
+  if (!data || data.length === 0) {
+    console.warn("[CarrierSync] Supabase update matched 0 rows", {
+      shipmentUuid,
+      organizationId,
+      hint: "Check shipment UUID and organization_id alignment with RLS",
+    });
+  }
 }
 
 async function lookupShipmentUuid(
@@ -274,7 +377,18 @@ async function lookupShipmentUuid(
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error("[CarrierSync] lookupShipmentUuid FAILED", {
+      shipmentNumber,
+      organizationId,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throwReadableError(error);
+  }
+
   return data?.id ?? null;
 }
 
@@ -285,10 +399,7 @@ export function buildMockExceptionFromSync(
 ): ExceptionRecord | null {
   if (!result.exceptionCreated || !result.exceptionTitle) return null;
 
-  const duplicate = existingExceptions.some(
-    (e) => e.shipmentId === shipment.id && e.status !== "Resolved",
-  );
-  if (duplicate) return null;
+  if (hasActiveCarrierException(existingExceptions, shipment.id)) return null;
 
   const idNum = 4400 + existingExceptions.length + 1;
   return {
@@ -310,6 +421,7 @@ export function buildMockExceptionFromSync(
       minute: "2-digit",
     }).replace(",", " ·"),
     updatedAt: "Just now",
+    source: "Carrier Sync",
     internalNotes: [],
   };
 }
@@ -335,23 +447,168 @@ export function applySyncResultToShipment(
   };
 }
 
-export async function notifyCarrierException(
-  organizationId: string,
-  exceptionId: string,
-  shipmentNumber: string,
-  title: string,
-): Promise<void> {
-  const input = buildExceptionNotificationInput(organizationId, {
-    exceptionId,
-    shipmentNumber,
-    title,
-    severity: "High",
-  });
-  if (!input) return;
+export const SIMULATED_CARRIER_EXCEPTION_TITLE = "Carrier Exception Detected";
+export const SIMULATED_CARRIER_EXCEPTION_DELAY_REASON =
+  "Carrier reported exception during sync";
 
+export type SimulateCarrierExceptionResult = {
+  carrierKey: CarrierKey;
+  shipmentId: string;
+  shipmentUpdated: boolean;
+  exceptionCreated: boolean;
+  skippedReason?: string;
+};
+
+export function findMonitoredShipmentForCarrier(
+  shipments: Shipment[],
+  carrierKey: CarrierKey,
+): Shipment | undefined {
+  return shipments.find((s) => {
+    if (s.status === "Delivered") return false;
+    return resolveCarrierKey(s.carrier) === carrierKey;
+  });
+}
+
+export function applySimulatedExceptionToShipment(
+  shipment: Shipment,
+  lastCarrierUpdate: string,
+): Shipment {
+  return {
+    ...shipment,
+    carrierStatus: "Exception",
+    lastCarrierUpdate: formatDisplayDate(lastCarrierUpdate),
+    status: "Exception",
+    issueStatus: "Open",
+    exception: SIMULATED_CARRIER_EXCEPTION_TITLE,
+    delayReason: SIMULATED_CARRIER_EXCEPTION_DELAY_REASON,
+    severity: "High",
+  };
+}
+
+export function buildMockSimulatedException(
+  shipment: Shipment,
+  existingExceptions: ExceptionRecord[],
+): ExceptionRecord | null {
+  if (hasActiveCarrierException(existingExceptions, shipment.id)) return null;
+
+  const idNum = 4400 + existingExceptions.length + 1;
+  return {
+    id: `EXC-${idNum}`,
+    shipmentId: shipment.id,
+    title: SIMULATED_CARRIER_EXCEPTION_TITLE,
+    customer: shipment.customer,
+    carrier: shipment.carrier,
+    route: `${shipment.origin} → ${shipment.destination}`,
+    severity: "High",
+    status: "Open",
+    owner: "System",
+    delayReason: SIMULATED_CARRIER_EXCEPTION_DELAY_REASON,
+    openedAt: new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).replace(",", " ·"),
+    updatedAt: "Just now",
+    source: "Carrier Sync",
+    internalNotes: [],
+  };
+}
+
+async function updateSimulatedShipmentCarrierException(
+  shipmentUuid: string,
+  organizationId: string,
+  lastCarrierUpdate: string,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("shipments")
+    .update({
+      carrier_status: "Exception",
+      last_carrier_update: lastCarrierUpdate,
+      status: "Exception",
+    })
+    .eq("id", shipmentUuid)
+    .eq("organization_id", organizationId)
+    .select("id, shipment_number, carrier_status, last_carrier_update, status");
+
+  if (error) {
+    throwReadableError(error);
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      `Simulated exception update matched 0 shipment rows (uuid=${shipmentUuid}).`,
+    );
+  }
+}
+
+export async function simulateCarrierException(
+  shipments: Shipment[],
+  exceptions: ExceptionRecord[],
+  carrierKey: CarrierKey,
+  organizationId?: string,
+): Promise<SimulateCarrierExceptionResult> {
   try {
-    await createNotification(input);
-  } catch {
-    // Notification failure should not block carrier sync.
+    const shipment = findMonitoredShipmentForCarrier(shipments, carrierKey);
+    if (!shipment) {
+      return {
+        carrierKey,
+        shipmentId: "",
+        shipmentUpdated: false,
+        exceptionCreated: false,
+        skippedReason: "No monitored shipment for carrier",
+      };
+    }
+
+    const existingCarrierException = hasActiveCarrierException(exceptions, shipment.id);
+    const lastCarrierUpdate = new Date().toISOString();
+
+    if (organizationId && isSupabaseConfigured()) {
+      const shipmentUuid = await lookupShipmentUuid(shipment.id, organizationId);
+      if (!shipmentUuid) {
+        throw new Error(`Shipment ${shipment.id} not found in organization.`);
+      }
+
+      await updateSimulatedShipmentCarrierException(
+        shipmentUuid,
+        organizationId,
+        lastCarrierUpdate,
+      );
+
+      let exceptionCreated = false;
+      if (!existingCarrierException) {
+        await createCarrierSyncExceptionInSupabase(
+          {
+            shipmentUuid,
+            shipmentNumber: shipment.id,
+            title: SIMULATED_CARRIER_EXCEPTION_TITLE,
+            severity: "High",
+            delayReason: SIMULATED_CARRIER_EXCEPTION_DELAY_REASON,
+            owner: "System",
+          },
+          organizationId,
+        );
+        exceptionCreated = true;
+      }
+
+      return {
+        carrierKey,
+        shipmentId: shipment.id,
+        shipmentUpdated: true,
+        exceptionCreated,
+      };
+    }
+
+    return {
+      carrierKey,
+      shipmentId: shipment.id,
+      shipmentUpdated: true,
+      exceptionCreated: !existingCarrierException,
+    };
+  } catch (error) {
+    logSimulateExceptionError("simulateCarrierException", error);
+    throw error instanceof Error ? error : new Error(formatUnknownError(error));
   }
 }

@@ -93,6 +93,7 @@ export function buildExceptionFromShipment(
     route: `${shipment.origin} → ${shipment.destination}`,
     openedAt: formatOpenedAt(),
     updatedAt: formatNowLabel(),
+    source: "Manual",
     internalNotes: [],
   };
 }
