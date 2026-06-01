@@ -443,6 +443,30 @@ export const customers: Customer[] = [
     slaTarget: 90,
     region: "South",
   },
+  {
+    id: "CUS-009",
+    name: "Harbor Textiles",
+    contactName: "Marcus Webb",
+    contactEmail: "marcus.webb@freightpulse.io",
+    tier: "Growth",
+    accountManager: "Marcus Webb",
+    activeShipments: 33,
+    exceptions: 3,
+    slaTarget: 92,
+    region: "Midwest",
+  },
+  {
+    id: "CUS-010",
+    name: "Lakeside Pharma",
+    contactName: "Sarah Chen",
+    contactEmail: "sarah.chen@freightpulse.io",
+    tier: "Enterprise",
+    accountManager: "Sarah Chen",
+    activeShipments: 41,
+    exceptions: 1,
+    slaTarget: 97,
+    region: "Southeast",
+  },
 ];
 
 export const carrierPerformance: CarrierPerformance[] = [
