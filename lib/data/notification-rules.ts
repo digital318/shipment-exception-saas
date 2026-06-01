@@ -17,6 +17,28 @@ export type SlaRiskNotificationContext = {
   exceptionId?: string;
 };
 
+export type OverdueFollowUpNotificationContext = {
+  exceptionId: string;
+  exceptionDisplayId: string;
+  shipmentNumber: string;
+  title: string;
+  customerName: string;
+  daysOverdue: number;
+};
+
+export type CustomerHighRiskNotificationContext = {
+  customerId: string;
+  customerName: string;
+  riskScore: number;
+  openExceptions: number;
+  exceptionId?: string;
+};
+
+export type SlaThresholdNotificationContext = {
+  compliancePercent: number;
+  threshold: number;
+};
+
 export type ResolutionNotificationContext = {
   exceptionId: string;
   shipmentNumber: string;
@@ -76,6 +98,48 @@ export function buildResolutionNotificationInput(
   };
 }
 
+export function buildOverdueFollowUpNotificationInput(
+  organizationId: string,
+  ctx: OverdueFollowUpNotificationContext,
+): CreateNotificationInput {
+  return {
+    organizationId,
+    type: "overdue_follow_up",
+    title: `Overdue follow-up — ${ctx.shipmentNumber}`,
+    message: `${ctx.title} · ${ctx.customerName} · ${ctx.daysOverdue} day${ctx.daysOverdue === 1 ? "" : "s"} overdue`,
+    severity: "High",
+    exceptionId: ctx.exceptionId,
+  };
+}
+
+export function buildCustomerHighRiskNotificationInput(
+  organizationId: string,
+  ctx: CustomerHighRiskNotificationContext,
+): CreateNotificationInput {
+  return {
+    organizationId,
+    type: "customer_high_risk",
+    title: `High-risk customer — ${ctx.customerName}`,
+    message: `Risk score ${ctx.riskScore}/100 · ${ctx.openExceptions} open exception${ctx.openExceptions === 1 ? "" : "s"}`,
+    severity: "Critical",
+    customerId: ctx.customerId,
+    exceptionId: ctx.exceptionId,
+  };
+}
+
+export function buildSlaThresholdNotificationInput(
+  organizationId: string,
+  ctx: SlaThresholdNotificationContext,
+): CreateNotificationInput {
+  return {
+    organizationId,
+    type: "sla_threshold_breach",
+    title: "SLA compliance below threshold",
+    message: `Network SLA compliance at ${ctx.compliancePercent}% vs ${ctx.threshold}% target threshold.`,
+    severity: "Critical",
+  };
+}
+
 export function buildCarrierExceptionNotificationInput(
   organizationId: string,
   ctx: ExceptionNotificationContext,
@@ -91,5 +155,12 @@ export function buildCarrierExceptionNotificationInput(
 }
 
 export function isEscalationNotification(type: NotificationType): boolean {
-  return type === "exception_critical" || type === "exception_high" || type === "sla_risk";
+  return (
+    type === "exception_critical" ||
+    type === "exception_high" ||
+    type === "sla_risk" ||
+    type === "overdue_follow_up" ||
+    type === "customer_high_risk" ||
+    type === "sla_threshold_breach"
+  );
 }

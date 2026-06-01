@@ -1,10 +1,12 @@
 "use client";
 
 import { DashboardShell } from "@/components/dashboard-shell";
+import { CustomerRiskSection } from "@/components/executive/customer-risk-section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { SyncStatus } from "@/components/ui/sync-status";
 import { useOrganization } from "@/context/organization-context";
+import { useExecutiveMetrics } from "@/hooks/use-executive-metrics";
 import { useSlaIntelligence } from "@/hooks/use-sla-intelligence";
 import type { DbCustomer } from "@/lib/database.types";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -90,6 +92,7 @@ function slaColor(riskLevel: CustomerRow["riskLevel"]) {
 export function CustomersPage() {
   const { profile } = useOrganization();
   const { customerMetrics } = useSlaIntelligence();
+  const { customerRiskProfiles } = useExecutiveMetrics();
 
   const [customers, setCustomers] = useState<DbCustomer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,6 +231,7 @@ export function CustomersPage() {
       }
       actions={<SyncStatus state={syncState} />}
     >
+      <div className="space-y-8">
       <div className={`${cardSurface} overflow-hidden`}>
         {loading ? (
           <LoadingState
@@ -332,6 +336,11 @@ export function CustomersPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {!loading && hasData && (
+        <CustomerRiskSection profiles={customerRiskProfiles} />
+      )}
       </div>
     </DashboardShell>
   );

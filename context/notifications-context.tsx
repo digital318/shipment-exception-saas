@@ -13,6 +13,7 @@ import {
 import { usePathname } from "next/navigation";
 import { useOrganization } from "@/context/organization-context";
 import { useExceptions } from "@/context/exceptions-context";
+import { useExecutiveMetrics } from "@/hooks/use-executive-metrics";
 import { useSlaIntelligence } from "@/hooks/use-sla-intelligence";
 import { isActiveException } from "@/lib/exception-utils";
 import {
@@ -21,8 +22,16 @@ import {
   markNotificationRead,
 } from "@/lib/data/notifications";
 import { processSlaRiskNotificationTransitions, buildRiskSnapshot } from "@/lib/data/sla-risk-notifications";
+import {
+  processOverdueFollowUpNotifications,
+  buildOverdueSnapshot,
+} from "@/lib/data/overdue-follow-up-notifications";
+import { processExecutiveIntelligenceNotifications } from "@/lib/data/executive-intelligence-notifications";
 import { isEscalationNotification } from "@/lib/data/notification-rules";
+import { isFollowUpOverdue } from "@/lib/playbooks";
 import type { RiskLevel } from "@/lib/sla-intelligence";
+import type { CustomerRiskProfile } from "@/lib/services/metrics-service";
+import { SLA_COMPLIANCE_THRESHOLD, CUSTOMER_HIGH_RISK_SCORE } from "@/lib/services/metrics-service";
 import { countUnreadNotifications } from "@/lib/notifications-utils";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { DataSource } from "@/lib/data/types";
@@ -51,6 +60,8 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 function buildMockNotifications(
   exceptions: ReturnType<typeof useExceptions>["exceptions"],
   atRiskCustomers: ReturnType<typeof useSlaIntelligence>["atRiskCustomers"],
+  customerRiskProfiles: CustomerRiskProfile[],
+  slaCompliancePercent: number,
   readIds: Set<string>,
 ): NotificationRecord[] {
   const items: NotificationRecord[] = [];
@@ -70,6 +81,23 @@ function buildMockNotifications(
         severity: exc.severity,
         status: readIds.has(id) ? "Read" : "Unread",
         createdAt: exc.openedAt,
+        customerName: exc.customer,
+        shipmentId: exc.shipmentId,
+      });
+    }
+
+    if (isActiveException(exc) && isFollowUpOverdue(exc.nextFollowUpAt)) {
+      const id = `mock-overdue-${exc.id}`;
+      items.push({
+        id,
+        organizationId: "mock",
+        exceptionId: exc.dbId ?? exc.id,
+        type: "overdue_follow_up",
+        title: `Overdue follow-up — ${exc.shipmentId}`,
+        message: `${exc.title} · ${exc.customer}`,
+        severity: "High",
+        status: readIds.has(id) ? "Read" : "Unread",
+        createdAt: exc.updatedAt,
         customerName: exc.customer,
         shipmentId: exc.shipmentId,
       });
@@ -130,6 +158,38 @@ function buildMockNotifications(
     });
   }
 
+  for (const customer of customerRiskProfiles.filter(
+    (c) => c.riskScore >= CUSTOMER_HIGH_RISK_SCORE || c.riskLevel === "red",
+  )) {
+    const id = `mock-highrisk-${customer.customerId}`;
+    items.push({
+      id,
+      organizationId: "mock",
+      customerId: customer.customerId,
+      type: "customer_high_risk",
+      title: `High-risk customer — ${customer.customerName}`,
+      message: `Risk score ${customer.riskScore}/100 · ${customer.openExceptions} open exceptions`,
+      severity: "Critical",
+      status: readIds.has(id) ? "Read" : "Unread",
+      createdAt: "Just now",
+      customerName: customer.customerName,
+    });
+  }
+
+  if (slaCompliancePercent < SLA_COMPLIANCE_THRESHOLD) {
+    const id = "mock-sla-threshold";
+    items.push({
+      id,
+      organizationId: "mock",
+      type: "sla_threshold_breach",
+      title: "SLA compliance below threshold",
+      message: `Network SLA compliance at ${slaCompliancePercent}% vs ${SLA_COMPLIANCE_THRESHOLD}% target threshold.`,
+      severity: "Critical",
+      status: readIds.has(id) ? "Read" : "Unread",
+      createdAt: "Just now",
+    });
+  }
+
   return items;
 }
 
@@ -137,7 +197,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { organization, profile, loading: orgLoading, needsOnboarding } = useOrganization();
   const { exceptions, refresh: refreshExceptions } = useExceptions();
-  const { atRiskCustomers, customerMetrics } = useSlaIntelligence();
+  const { atRiskCustomers, customerMetrics, slaCompliancePercent } = useSlaIntelligence();
+  const { customerRiskProfiles } = useExecutiveMetrics();
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [mockReadIds, setMockReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -149,6 +210,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const previousRiskByCustomerRef = useRef<Map<string, RiskLevel>>(new Map());
   const lastRiskSnapshotRef = useRef("");
   const slaTransitionInFlightRef = useRef(false);
+  const previousOverdueIdsRef = useRef<Set<string>>(new Set());
+  const lastOverdueSnapshotRef = useRef("");
+  const overdueTransitionInFlightRef = useRef(false);
+  const previousHighRiskCustomerIdsRef = useRef<Set<string>>(new Set());
+  const wasBelowSlaThresholdRef = useRef(false);
+  const executiveTransitionInFlightRef = useRef(false);
   const loadNotificationsRef = useRef<(() => Promise<void>) | null>(null);
 
   const loadNotifications = useCallback(async () => {
@@ -221,6 +288,74 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [customerMetrics, orgLoading, needsOnboarding, useSupabase, organizationId]);
 
   useEffect(() => {
+    if (orgLoading || needsOnboarding || !useSupabase || !organizationId) return;
+
+    const snapshot = buildOverdueSnapshot(exceptions);
+    if (snapshot === lastOverdueSnapshotRef.current) return;
+    if (overdueTransitionInFlightRef.current) return;
+
+    overdueTransitionInFlightRef.current = true;
+    lastOverdueSnapshotRef.current = snapshot;
+
+    void processOverdueFollowUpNotifications(
+      organizationId,
+      exceptions,
+      previousOverdueIdsRef.current,
+    )
+      .then(async ({ result, nextOverdueIds, overdueSnapshot }) => {
+        previousOverdueIdsRef.current = nextOverdueIds;
+        lastOverdueSnapshotRef.current = overdueSnapshot;
+        if (result.created > 0) {
+          await loadNotificationsRef.current?.();
+        }
+      })
+      .catch((err) => {
+        console.error("[FreightPulse] Overdue follow-up processing failed", err);
+        lastOverdueSnapshotRef.current = "";
+      })
+      .finally(() => {
+        overdueTransitionInFlightRef.current = false;
+      });
+  }, [exceptions, orgLoading, needsOnboarding, useSupabase, organizationId]);
+
+  useEffect(() => {
+    if (orgLoading || needsOnboarding || !useSupabase || !organizationId) return;
+    if (customerRiskProfiles.length === 0 && customerMetrics.length === 0) return;
+    if (executiveTransitionInFlightRef.current) return;
+
+    executiveTransitionInFlightRef.current = true;
+
+    void processExecutiveIntelligenceNotifications(
+      organizationId,
+      slaCompliancePercent,
+      customerRiskProfiles,
+      previousHighRiskCustomerIdsRef.current,
+      wasBelowSlaThresholdRef.current,
+    )
+      .then(async ({ result, nextHighRiskCustomerIds, isBelowSlaThreshold }) => {
+        previousHighRiskCustomerIdsRef.current = nextHighRiskCustomerIds;
+        wasBelowSlaThresholdRef.current = isBelowSlaThreshold;
+        if (result.created > 0) {
+          await loadNotificationsRef.current?.();
+        }
+      })
+      .catch((err) => {
+        console.error("[FreightPulse] Executive intelligence processing failed", err);
+      })
+      .finally(() => {
+        executiveTransitionInFlightRef.current = false;
+      });
+  }, [
+    customerRiskProfiles,
+    customerMetrics.length,
+    slaCompliancePercent,
+    orgLoading,
+    needsOnboarding,
+    useSupabase,
+    organizationId,
+  ]);
+
+  useEffect(() => {
     if (orgLoading) return;
     if (!useSupabase || !organizationId) {
       setNotifications([]);
@@ -233,8 +368,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [loadNotifications, orgLoading, useSupabase, organizationId, pathname]);
 
   const mockNotifications = useMemo(
-    () => buildMockNotifications(exceptions, atRiskCustomers, mockReadIds),
-    [exceptions, atRiskCustomers, mockReadIds],
+    () =>
+      buildMockNotifications(
+        exceptions,
+        atRiskCustomers,
+        customerRiskProfiles,
+        slaCompliancePercent,
+        mockReadIds,
+      ),
+    [exceptions, atRiskCustomers, customerRiskProfiles, slaCompliancePercent, mockReadIds],
   );
 
   const displayNotifications = useMemo(() => {

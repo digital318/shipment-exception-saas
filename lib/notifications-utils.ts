@@ -23,7 +23,10 @@ export type NotificationTypeFilter =
   | "sla_risk"
   | "exception_critical"
   | "exception_high"
-  | "resolution";
+  | "resolution"
+  | "overdue_follow_up"
+  | "customer_high_risk"
+  | "sla_threshold_breach";
 
 export const NOTIFICATION_TYPE_FILTER_OPTIONS: {
   value: NotificationTypeFilter;
@@ -33,6 +36,9 @@ export const NOTIFICATION_TYPE_FILTER_OPTIONS: {
   { value: "sla_risk", label: "SLA Risk" },
   { value: "exception_critical", label: "Exception Critical" },
   { value: "exception_high", label: "Alert" },
+  { value: "overdue_follow_up", label: "Overdue Follow-Up" },
+  { value: "customer_high_risk", label: "Customer High Risk" },
+  { value: "sla_threshold_breach", label: "SLA Threshold" },
   { value: "resolution", label: "Resolution" },
 ];
 

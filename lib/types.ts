@@ -170,7 +170,15 @@ export type WeeklyTrendPoint = {
   exceptions: number;
 };
 
-export type ActivityType = "escalation" | "action" | "update" | "resolved" | "alert";
+export type ActivityType =
+  | "escalation"
+  | "action"
+  | "update"
+  | "resolved"
+  | "alert"
+  | "overdue_follow_up"
+  | "customer_risk"
+  | "sla_breach";
 
 export type ActivityItem = {
   time: string;
@@ -184,7 +192,10 @@ export type NotificationType =
   | "exception_critical"
   | "exception_high"
   | "sla_risk"
-  | "resolution";
+  | "resolution"
+  | "overdue_follow_up"
+  | "customer_high_risk"
+  | "sla_threshold_breach";
 
 export type NotificationStatus = "Unread" | "Read";
 

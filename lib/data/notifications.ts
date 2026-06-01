@@ -19,10 +19,28 @@ const NOTIFICATION_SELECT = `
   )
 `;
 
+export async function findAnyOpenException(organizationId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("exceptions")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .is("resolved_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data.id;
+}
+
 async function insertActivityForNotification(
   organizationId: string,
   exceptionId: string | undefined,
   message: string,
+  eventType: "alert" | "overdue_follow_up" | "customer_risk" | "sla_breach" = "alert",
 ): Promise<void> {
   if (!exceptionId) return;
 
@@ -30,8 +48,8 @@ async function insertActivityForNotification(
   const { error } = await supabase.from("activity_events").insert({
     exception_id: exceptionId,
     organization_id: organizationId,
-    event_type: "alert",
-    message: `Notification: ${message}`,
+    event_type: eventType,
+    message: eventType === "alert" ? `Notification: ${message}` : message,
   });
 
   if (error) throw error;
@@ -39,6 +57,7 @@ async function insertActivityForNotification(
 
 export async function createNotification(
   input: CreateNotificationInput,
+  options?: { activityEventType?: "alert" | "overdue_follow_up" | "customer_risk" | "sla_breach" },
 ): Promise<string> {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured.");
@@ -66,6 +85,7 @@ export async function createNotification(
     input.organizationId,
     input.exceptionId,
     input.title,
+    options?.activityEventType ?? "alert",
   );
 
   return data.id;

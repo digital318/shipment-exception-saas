@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { EscalationAgingTable } from "@/components/executive/escalation-aging-table";
 import { NotificationListItem } from "@/components/notifications/notification-list-item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { SyncStatus } from "@/components/ui/sync-status";
 import { useNotifications } from "@/context/notifications-context";
+import { useExecutiveMetrics } from "@/hooks/use-executive-metrics";
 import { groupEscalationsByCategory } from "@/lib/notifications-utils";
 import { btnSecondary, cardSurface, sectionLabel } from "@/lib/styles";
 
@@ -74,6 +76,7 @@ function MetricCard({
 export function EscalationsPage() {
   const { notifications, loading, error, source, refresh, markRead, markAllRead } =
     useNotifications();
+  const { escalationAging } = useExecutiveMetrics();
 
   const groups = useMemo(
     () => groupEscalationsByCategory(notifications),
@@ -184,6 +187,8 @@ export function EscalationsPage() {
             items={groups.slaRisk}
             onMarkRead={(id) => void markRead(id)}
           />
+
+          <EscalationAgingTable rows={escalationAging} />
         </div>
       )}
     </DashboardShell>

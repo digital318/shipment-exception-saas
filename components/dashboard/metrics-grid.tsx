@@ -3,30 +3,36 @@
 import {
   IconAlertCircle,
   IconCheckCircle,
+  IconClock,
   IconHeartPulse,
+  IconTrendingUp,
   IconUsers,
+  IconZap,
 } from "@/components/icons";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
-import { useSlaIntelligence } from "@/hooks/use-sla-intelligence";
+import { useExecutiveMetrics } from "@/hooks/use-executive-metrics";
 import { badgeBase, cardSurface } from "@/lib/styles";
+
+type Trend = "up" | "down" | "neutral";
 
 export function MetricsGrid() {
   const {
-    networkHealthScore,
-    slaCompliancePercent,
-    customersAtRisk,
-    criticalExceptions,
     openExceptions,
-    overallOnTimePercent,
-    averageSlaTarget,
+    escalatedExceptions,
+    overdueFollowUps,
+    customersAtRisk,
+    slaCompliancePercent,
+    networkHealthScore,
+    averageResolutionTimeHours,
+    exceptionsCreatedLast7Days,
     loading,
     error,
     refresh,
-  } = useSlaIntelligence();
+  } = useExecutiveMetrics();
 
   if (loading) {
     return (
-      <section aria-label="Intelligence metrics">
+      <section aria-label="Executive metrics">
         <div className={`${cardSurface} overflow-hidden`}>
           <LoadingState
             title="Loading intelligence"
@@ -39,7 +45,7 @@ export function MetricsGrid() {
 
   if (error) {
     return (
-      <section aria-label="Intelligence metrics">
+      <section aria-label="Executive metrics">
         <div className={`${cardSurface} overflow-hidden`}>
           <ErrorState description={error} onRetry={() => void refresh()} />
         </div>
@@ -47,34 +53,56 @@ export function MetricsGrid() {
     );
   }
 
-  const metrics = [
+  const metrics: {
+    label: string;
+    value: string;
+    delta: string;
+    hint: string;
+    trend: Trend;
+    gradient: string;
+    icon: typeof IconHeartPulse;
+    iconColor: string;
+    iconBg: string;
+  }[] = [
     {
-      label: "Network Health Score",
-      value: String(networkHealthScore),
-      delta: `${openExceptions} open exceptions`,
-      hint: "0–100 risk-adjusted score",
-      trend:
-        networkHealthScore >= 70
-          ? ("up" as const)
-          : networkHealthScore >= 50
-            ? ("neutral" as const)
-            : ("down" as const),
-      gradient: "from-violet-500/20 via-indigo-500/10 to-transparent",
-      icon: IconHeartPulse,
-      iconColor: "text-violet-400",
-      iconBg: "bg-violet-500/10 ring-violet-500/20",
+      label: "Open Exceptions",
+      value: String(openExceptions),
+      delta: `${escalatedExceptions} escalated`,
+      hint: "active across network",
+      trend: openExceptions <= 3 ? "up" : openExceptions <= 8 ? "neutral" : "down",
+      gradient: "from-rose-500/20 via-pink-500/10 to-transparent",
+      icon: IconAlertCircle,
+      iconColor: "text-rose-400",
+      iconBg: "bg-rose-500/10 ring-rose-500/20",
+    },
+    {
+      label: "Escalated Exceptions",
+      value: String(escalatedExceptions),
+      delta: `${openExceptions} total open`,
+      hint: "level 2+ or escalated status",
+      trend: escalatedExceptions === 0 ? "up" : escalatedExceptions <= 2 ? "neutral" : "down",
+      gradient: "from-orange-500/20 via-amber-500/10 to-transparent",
+      icon: IconZap,
+      iconColor: "text-orange-400",
+      iconBg: "bg-orange-500/10 ring-orange-500/20",
+    },
+    {
+      label: "Overdue Follow-Ups",
+      value: String(overdueFollowUps),
+      delta: overdueFollowUps === 0 ? "All on schedule" : "playbooks past due",
+      hint: "next_follow_up_at passed",
+      trend: overdueFollowUps === 0 ? "up" : overdueFollowUps <= 2 ? "neutral" : "down",
+      gradient: "from-amber-500/20 via-yellow-500/10 to-transparent",
+      icon: IconClock,
+      iconColor: "text-amber-400",
+      iconBg: "bg-amber-500/10 ring-amber-500/20",
     },
     {
       label: "Customers At Risk",
       value: String(customersAtRisk),
       delta: customersAtRisk === 0 ? "All on target" : "below SLA threshold",
       hint: "yellow or red status",
-      trend:
-        customersAtRisk === 0
-          ? ("up" as const)
-          : customersAtRisk <= 2
-            ? ("neutral" as const)
-            : ("down" as const),
+      trend: customersAtRisk === 0 ? "up" : customersAtRisk <= 2 ? "neutral" : "down",
       gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
       icon: IconUsers,
       iconColor: "text-amber-400",
@@ -83,39 +111,61 @@ export function MetricsGrid() {
     {
       label: "SLA Compliance",
       value: `${slaCompliancePercent}%`,
-      delta: `${overallOnTimePercent.toFixed(1)}% on-time`,
-      hint: `avg target ${averageSlaTarget.toFixed(1)}%`,
-      trend:
-        slaCompliancePercent >= 80
-          ? ("up" as const)
-          : slaCompliancePercent >= 60
-            ? ("neutral" as const)
-            : ("down" as const),
+      delta: slaCompliancePercent >= 80 ? "meeting threshold" : "below 80% target",
+      hint: "customers on green SLA",
+      trend: slaCompliancePercent >= 80 ? "up" : slaCompliancePercent >= 60 ? "neutral" : "down",
       gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
       icon: IconCheckCircle,
       iconColor: "text-emerald-400",
       iconBg: "bg-emerald-500/10 ring-emerald-500/20",
     },
     {
-      label: "Critical Exceptions",
-      value: String(criticalExceptions),
-      delta: `${openExceptions} total open`,
-      hint: "require immediate action",
+      label: "Network Health Score",
+      value: String(networkHealthScore),
+      delta: `${openExceptions} open exceptions`,
+      hint: "0–100 risk-adjusted score",
+      trend: networkHealthScore >= 70 ? "up" : networkHealthScore >= 50 ? "neutral" : "down",
+      gradient: "from-violet-500/20 via-indigo-500/10 to-transparent",
+      icon: IconHeartPulse,
+      iconColor: "text-violet-400",
+      iconBg: "bg-violet-500/10 ring-violet-500/20",
+    },
+    {
+      label: "Avg Resolution Time",
+      value: averageResolutionTimeHours > 0 ? `${averageResolutionTimeHours}h` : "—",
+      delta: "resolved exceptions",
+      hint: "open to close duration",
       trend:
-        criticalExceptions === 0
-          ? ("up" as const)
-          : criticalExceptions <= 2
-            ? ("neutral" as const)
-            : ("down" as const),
-      gradient: "from-rose-500/20 via-pink-500/10 to-transparent",
-      icon: IconAlertCircle,
-      iconColor: "text-rose-400",
-      iconBg: "bg-rose-500/10 ring-rose-500/20",
+        averageResolutionTimeHours <= 24
+          ? "up"
+          : averageResolutionTimeHours <= 72
+            ? "neutral"
+            : "down",
+      gradient: "from-sky-500/20 via-blue-500/10 to-transparent",
+      icon: IconClock,
+      iconColor: "text-sky-400",
+      iconBg: "bg-sky-500/10 ring-sky-500/20",
+    },
+    {
+      label: "Exceptions (7 days)",
+      value: String(exceptionsCreatedLast7Days),
+      delta: "created this week",
+      hint: "new operational issues",
+      trend:
+        exceptionsCreatedLast7Days <= 3
+          ? "up"
+          : exceptionsCreatedLast7Days <= 8
+            ? "neutral"
+            : "down",
+      gradient: "from-indigo-500/20 via-violet-500/10 to-transparent",
+      icon: IconTrendingUp,
+      iconColor: "text-indigo-400",
+      iconBg: "bg-indigo-500/10 ring-indigo-500/20",
     },
   ];
 
   return (
-    <section aria-label="Intelligence metrics">
+    <section aria-label="Executive metrics">
       <div className="grid gap-4 sm:grid-cols-2 lg:gap-5 xl:grid-cols-4">
         {metrics.map((metric) => (
           <div
@@ -143,9 +193,7 @@ export function MetricsGrid() {
                 {metric.trend === "up" ? "↑" : metric.trend === "down" ? "↓" : "•"}
               </span>
             </div>
-            <p className="relative mt-6 text-xs font-medium text-zinc-500">
-              {metric.label}
-            </p>
+            <p className="relative mt-6 text-xs font-medium text-zinc-500">{metric.label}</p>
             <p className="relative mt-1.5 text-[1.75rem] font-semibold tabular-nums tracking-tight text-white">
               {metric.value}
             </p>

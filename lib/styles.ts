@@ -79,13 +79,31 @@ export const activityTypeStyles: Record<string, string> = {
   update: `${badgeBase} bg-violet-500/10 text-violet-400 ring-violet-500/20`,
   resolved: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
   alert: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
+  overdue_follow_up: `${badgeBase} bg-orange-500/10 text-orange-400 ring-orange-500/20`,
+  customer_risk: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
+  sla_breach: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
 };
+
+export const agingHealthStyles = {
+  green: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  yellow: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
+  red: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
+} as const;
+
+export const agingHealthLabels = {
+  green: "Healthy",
+  yellow: "Approaching",
+  red: "Overdue",
+} as const;
 
 export const notificationTypeStyles: Record<string, string> = {
   exception_critical: `${badgeBase} bg-rose-500/10 text-rose-300 ring-rose-500/25`,
   exception_high: `${badgeBase} bg-orange-500/10 text-orange-300 ring-orange-500/25`,
   sla_risk: `${badgeBase} bg-amber-500/10 text-amber-300 ring-amber-500/25`,
   resolution: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  overdue_follow_up: `${badgeBase} bg-orange-500/10 text-orange-300 ring-orange-500/25`,
+  customer_high_risk: `${badgeBase} bg-rose-500/10 text-rose-300 ring-rose-500/25`,
+  sla_threshold_breach: `${badgeBase} bg-amber-500/10 text-amber-300 ring-amber-500/25`,
 };
 
 export const notificationTypeLabels: Record<string, string> = {
@@ -93,6 +111,9 @@ export const notificationTypeLabels: Record<string, string> = {
   exception_high: "Alert",
   sla_risk: "SLA Risk",
   resolution: "Resolution",
+  overdue_follow_up: "Overdue Follow-Up",
+  customer_high_risk: "Customer High Risk",
+  sla_threshold_breach: "SLA Threshold",
 };
 
 export const riskLevelStyles = {
