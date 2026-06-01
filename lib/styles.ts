@@ -82,6 +82,8 @@ export const activityTypeStyles: Record<string, string> = {
   overdue_follow_up: `${badgeBase} bg-orange-500/10 text-orange-400 ring-orange-500/20`,
   customer_risk: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
   sla_breach: `${badgeBase} bg-amber-500/10 text-amber-400 ring-amber-500/20`,
+  report_generated: `${badgeBase} bg-indigo-500/10 text-indigo-400 ring-indigo-500/20`,
+  report_exported: `${badgeBase} bg-teal-500/10 text-teal-400 ring-teal-500/20`,
 };
 
 export const agingHealthStyles = {

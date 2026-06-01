@@ -178,7 +178,9 @@ export type ActivityType =
   | "alert"
   | "overdue_follow_up"
   | "customer_risk"
-  | "sla_breach";
+  | "sla_breach"
+  | "report_generated"
+  | "report_exported";
 
 export type ActivityItem = {
   time: string;

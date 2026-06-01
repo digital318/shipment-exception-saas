@@ -8,6 +8,7 @@ import {
   IconBarChart,
   IconBell,
   IconBriefcase,
+  IconFileText,
   IconLayoutDashboard,
   IconLogo,
   IconPackage,
@@ -39,6 +40,7 @@ const navItems = [
   { label: "Customer Portal", href: "/portal", icon: IconPortal },
   { label: "Carriers", href: "/carriers", icon: IconTruck },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
+  { label: "Reports", href: "/reports", icon: IconFileText },
   { label: "Settings", href: "/settings", icon: IconSettings },
 ];
 

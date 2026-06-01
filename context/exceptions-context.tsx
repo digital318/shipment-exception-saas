@@ -101,6 +101,10 @@ type ExceptionsContextValue = {
   escalatePlaybook: (id: string) => Promise<void>;
   syncCarriers: (carrierFilter?: CarrierKey) => Promise<OrganizationSyncResult>;
   simulateCarrierException: (carrierKey: CarrierKey) => Promise<SimulateCarrierExceptionResult>;
+  logReportActivity: (
+    message: string,
+    type: "report_generated" | "report_exported",
+  ) => void;
 };
 
 const ExceptionsContext = createContext<ExceptionsContextValue | null>(null);
@@ -174,6 +178,22 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
           event: `Notification: ${message}`,
           shipmentId,
           type: "alert",
+        },
+        ...act,
+      ]);
+    },
+    [],
+  );
+
+  const logReportActivity = useCallback(
+    (message: string, type: "report_generated" | "report_exported") => {
+      setActivity((act) => [
+        {
+          time: formatNowLabel(),
+          actor: CURRENT_USER,
+          event: message,
+          shipmentId: null,
+          type,
         },
         ...act,
       ]);
@@ -862,6 +882,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       escalatePlaybook,
       syncCarriers,
       simulateCarrierException: simulateCarrierExceptionAction,
+      logReportActivity,
     }),
     [
       shipments,
@@ -890,6 +911,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       escalatePlaybook,
       syncCarriers,
       simulateCarrierExceptionAction,
+      logReportActivity,
     ],
   );
 

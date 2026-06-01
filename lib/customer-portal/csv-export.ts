@@ -1,32 +1,7 @@
-import type { CustomerSafeException } from "./visibility";
-import type { Shipment } from "@/lib/types";
+import { dateStamp, downloadCsv, rowsToCsv } from "@/lib/export/csv-utils";
 import type { CustomerRiskProfile } from "@/lib/services/metrics-service";
-
-function escapeCsvValue(value: string | number | null | undefined): string {
-  const str = value == null ? "" : String(value);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-function rowsToCsv(headers: string[], rows: string[][]): string {
-  const lines = [headers.map(escapeCsvValue).join(",")];
-  for (const row of rows) {
-    lines.push(row.map(escapeCsvValue).join(","));
-  }
-  return lines.join("\n");
-}
-
-function downloadCsv(filename: string, content: string): void {
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
+import type { Shipment } from "@/lib/types";
+import type { CustomerSafeException } from "./visibility";
 
 export function exportShipmentReportCsv(
   customerName: string,
@@ -115,6 +90,3 @@ export function exportSlaReportCsv(
   downloadCsv(`${slug}-sla-${dateStamp()}.csv`, csv);
 }
 
-function dateStamp(): string {
-  return new Date().toISOString().slice(0, 10);
-}

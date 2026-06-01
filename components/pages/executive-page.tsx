@@ -58,6 +58,12 @@ export function ExecutivePage() {
       actions={
         <>
           <SyncStatus state={syncState} />
+          <Link
+            href="/reports?report=executive-summary&generate=1"
+            className={btnSecondary}
+          >
+            Generate Executive Report
+          </Link>
           <Link href="/analytics" className={btnSecondary}>
             Full analytics
           </Link>
