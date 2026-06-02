@@ -22,6 +22,7 @@ import type {
   ShipmentStatus,
 } from "@/lib/types";
 import { createCarrierSyncExceptionInSupabase } from "@/lib/data/mutations";
+import { notifyCustomerOnShipmentStatusChange } from "@/lib/data/customer-notification-triggers";
 
 export type ShipmentSyncInput = {
   shipmentNumber: string;
@@ -211,6 +212,22 @@ export async function syncShipment(
         actual_delivery: snapshot.actualDelivery,
         status: shipmentStatus,
       });
+
+      if (statusChanged) {
+        try {
+          await notifyCustomerOnShipmentStatusChange(
+            organizationId,
+            shipmentUuid,
+            input.currentStatus,
+            shipmentStatus,
+          );
+        } catch (err) {
+          console.error("[CarrierSync] Customer notification failed", {
+            shipmentNumber: input.shipmentNumber,
+            error: err instanceof Error ? err.message : err,
+          });
+        }
+      }
     }
   }
 

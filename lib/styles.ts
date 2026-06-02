@@ -108,6 +108,24 @@ export const notificationTypeStyles: Record<string, string> = {
   sla_threshold_breach: `${badgeBase} bg-amber-500/10 text-amber-300 ring-amber-500/25`,
 };
 
+export const customerNotificationTypeStyles: Record<string, string> = {
+  shipment_delayed: `${badgeBase} bg-amber-500/10 text-amber-300 ring-amber-500/25`,
+  shipment_exception: `${badgeBase} bg-orange-500/10 text-orange-300 ring-orange-500/25`,
+  shipment_delivered: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  exception_updated: `${badgeBase} bg-sky-500/10 text-sky-300 ring-sky-500/25`,
+  exception_resolved: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  sla_risk_warning: `${badgeBase} bg-rose-500/10 text-rose-300 ring-rose-500/25`,
+};
+
+export const customerNotificationTypeLabels: Record<string, string> = {
+  shipment_delayed: "Shipment Delayed",
+  shipment_exception: "Shipment Exception",
+  shipment_delivered: "Shipment Delivered",
+  exception_updated: "Exception Updated",
+  exception_resolved: "Exception Resolved",
+  sla_risk_warning: "SLA Risk Warning",
+};
+
 export const notificationTypeLabels: Record<string, string> = {
   exception_critical: "Exception Critical",
   exception_high: "Alert",

@@ -2,11 +2,13 @@
 
 import { useMemo } from "react";
 import { useCustomerPortal } from "@/context/customer-portal-context";
+import { useCustomerNotifications } from "@/context/customer-notifications-context";
 import { useExceptions } from "@/context/exceptions-context";
 import {
   computeCustomerPortalDashboard,
   computeCustomerPortalScorecard,
 } from "@/lib/customer-portal/metrics";
+import { buildCustomerTimeline } from "@/lib/customer-portal/timeline";
 import {
   filterCustomerSafeActivity,
   filterExceptionsByCustomer,
@@ -20,10 +22,13 @@ export function useCustomerPortalData() {
   const { selectedCustomer } = useCustomerPortal();
   const { shipments, exceptions, activity, customers, loading, error, refresh, source } =
     useExceptions();
+  const { getNotificationsForCustomer } = useCustomerNotifications();
 
   const customer = useMemo((): Customer | null => {
     return customers.find((c) => c.name === selectedCustomer) ?? null;
   }, [customers, selectedCustomer]);
+
+  const customerId = customer?.dbId ?? customer?.id;
 
   const customerShipments = useMemo(
     () => filterShipmentsByCustomer(shipments, selectedCustomer),
@@ -55,6 +60,16 @@ export function useCustomerPortalData() {
     [activity, shipmentIds],
   );
 
+  const customerNotifications = useMemo(() => {
+    if (!customerId) return [];
+    return getNotificationsForCustomer(customerId);
+  }, [customerId, getNotificationsForCustomer]);
+
+  const customerTimeline = useMemo(
+    () => buildCustomerTimeline(customerActivity, customerNotifications),
+    [customerActivity, customerNotifications],
+  );
+
   const dashboard = useMemo(() => {
     if (!customer) return null;
     return computeCustomerPortalDashboard(customer, shipments, exceptions);
@@ -71,6 +86,8 @@ export function useCustomerPortalData() {
     customerShipments,
     openExceptions: safeExceptions,
     customerActivity,
+    customerNotifications,
+    customerTimeline,
     dashboard,
     scorecard,
     loading,

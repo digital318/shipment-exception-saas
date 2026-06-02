@@ -12,6 +12,7 @@ import {
 } from "@/lib/styles";
 import type {
   CarrierPerformanceRow,
+  CustomerCommunicationReport,
   CustomerSlaRow,
   EscalationReportRow,
   ExceptionReportRow,
@@ -380,6 +381,71 @@ export function ReportContent({
             ))
           )}
         </TableShell>
+      );
+    }
+
+    case "customer-communication": {
+      const d = data as CustomerCommunicationReport;
+      return (
+        <div className="space-y-6">
+          <MetricCards
+            metrics={[
+              { label: "Total Notifications", value: d.totalNotifications },
+              { label: "Unread", value: d.unreadCount },
+              { label: "Read Rate", value: `${d.readRatePercent}%` },
+              { label: "Delay Notices", value: d.delayNotices },
+              { label: "Resolution Notices", value: d.resolutionNotices },
+              { label: "Exception Notices", value: d.exceptionNotices },
+              { label: "SLA Warnings", value: d.slaWarnings },
+            ]}
+          />
+
+          <TableShell
+            title="By Customer"
+            headers={[
+              "Customer",
+              "Total",
+              "Unread",
+              "Read Rate",
+              "Delay Notices",
+              "Resolution Notices",
+            ]}
+          >
+            {d.byCustomer.length === 0 ? (
+              <EmptyRow colSpan={6} message="No customer communications match the selected filters." />
+            ) : (
+              d.byCustomer.map((r) => (
+                <tr key={r.customerName} className="hover:bg-white/[0.025]">
+                  <td className="px-6 py-4 text-[13px] font-medium text-white">{r.customerName}</td>
+                  <td className="px-6 py-4 tabular-nums text-[13px] text-zinc-300">{r.total}</td>
+                  <td className="px-6 py-4 tabular-nums text-[13px] text-violet-300">{r.unread}</td>
+                  <td className="px-6 py-4 tabular-nums text-[13px] text-emerald-300">
+                    {r.readRatePercent}%
+                  </td>
+                  <td className="px-6 py-4 tabular-nums text-[13px] text-amber-300">
+                    {r.delayNotices}
+                  </td>
+                  <td className="px-6 py-4 tabular-nums text-[13px] text-emerald-300">
+                    {r.resolutionNotices}
+                  </td>
+                </tr>
+              ))
+            )}
+          </TableShell>
+
+          <TableShell title="By Type" headers={["Type", "Count"]}>
+            {d.byType.length === 0 ? (
+              <EmptyRow colSpan={2} message="No notification types recorded." />
+            ) : (
+              d.byType.map((r) => (
+                <tr key={r.type} className="hover:bg-white/[0.025]">
+                  <td className="px-6 py-4 text-[13px] font-medium text-white">{r.label}</td>
+                  <td className="px-6 py-4 tabular-nums text-[13px] text-zinc-300">{r.count}</td>
+                </tr>
+              ))
+            )}
+          </TableShell>
+        </div>
       );
     }
 

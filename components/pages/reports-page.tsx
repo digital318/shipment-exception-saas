@@ -10,6 +10,7 @@ import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SyncStatus } from "@/components/ui/sync-status";
 import { useExceptions } from "@/context/exceptions-context";
+import { useCustomerNotifications } from "@/context/customer-notifications-context";
 import { useReportData } from "@/hooks/use-report-data";
 import {
   buildReportActivityMessage,
@@ -41,6 +42,7 @@ export function ReportsPage() {
   const [generatedReports, setGeneratedReports] = useState<Set<ReportId>>(new Set());
 
   const { customers, carriers, logReportActivity } = useExceptions();
+  const { notifications: customerNotifications } = useCustomerNotifications();
   const {
     data,
     shipments,
@@ -169,11 +171,25 @@ export function ReportsPage() {
                   </button>
                   <ReportExportActions
                     onExportCsv={async () => {
-                      exportReportCsv(selectedReport, customers, shipments, exceptions, filters);
+                      exportReportCsv(
+                        selectedReport,
+                        customers,
+                        shipments,
+                        exceptions,
+                        filters,
+                        customerNotifications,
+                      );
                       await recordActivity("report_exported", "csv");
                     }}
                     onExportPdf={async () => {
-                      exportReportPdf(selectedReport, customers, shipments, exceptions, filters);
+                      exportReportPdf(
+                        selectedReport,
+                        customers,
+                        shipments,
+                        exceptions,
+                        filters,
+                        customerNotifications,
+                      );
                       await recordActivity("report_exported", "pdf");
                     }}
                   />

@@ -180,7 +180,9 @@ export type ActivityType =
   | "customer_risk"
   | "sla_breach"
   | "report_generated"
-  | "report_exported";
+  | "report_exported"
+  | "customer_notification_created"
+  | "customer_notification_read";
 
 export type ActivityItem = {
   time: string;
@@ -227,4 +229,41 @@ export type CreateNotificationInput = {
   severity: Severity;
   exceptionId?: string;
   customerId?: string;
+};
+
+export type CustomerNotificationType =
+  | "shipment_delayed"
+  | "shipment_exception"
+  | "shipment_delivered"
+  | "exception_updated"
+  | "exception_resolved"
+  | "sla_risk_warning";
+
+export type CustomerNotificationStatus = "Unread" | "Read";
+
+export type CustomerNotificationRecord = {
+  id: string;
+  organizationId: string;
+  customerId: string;
+  shipmentId?: string;
+  exceptionId?: string;
+  type: CustomerNotificationType;
+  title: string;
+  message: string;
+  status: CustomerNotificationStatus;
+  createdAt: string;
+  readAt?: string;
+  /** Enriched display fields */
+  customerName?: string;
+  shipmentNumber?: string;
+};
+
+export type CreateCustomerNotificationInput = {
+  organizationId: string;
+  customerId: string;
+  type: CustomerNotificationType;
+  title: string;
+  message: string;
+  shipmentId?: string;
+  exceptionId?: string;
 };

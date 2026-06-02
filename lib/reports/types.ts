@@ -6,7 +6,8 @@ export type ReportId =
   | "customer-sla"
   | "exception"
   | "escalation"
-  | "carrier-performance";
+  | "carrier-performance"
+  | "customer-communication";
 
 export type DateRangePreset = "7d" | "30d" | "90d" | "all";
 
@@ -91,6 +92,29 @@ export type CarrierPerformanceRow = {
   healthStatus: string;
 };
 
+export type CustomerCommunicationReport = {
+  totalNotifications: number;
+  unreadCount: number;
+  readRatePercent: number;
+  delayNotices: number;
+  resolutionNotices: number;
+  exceptionNotices: number;
+  slaWarnings: number;
+  byCustomer: {
+    customerName: string;
+    total: number;
+    unread: number;
+    readRatePercent: number;
+    delayNotices: number;
+    resolutionNotices: number;
+  }[];
+  byType: {
+    type: string;
+    label: string;
+    count: number;
+  }[];
+};
+
 export const REPORT_DEFINITIONS: {
   id: ReportId;
   title: string;
@@ -125,5 +149,10 @@ export const REPORT_DEFINITIONS: {
     id: "carrier-performance",
     title: "Carrier Performance Report",
     description: "Carrier on-time delivery, delays, and health status",
+  },
+  {
+    id: "customer-communication",
+    title: "Customer Communication Report",
+    description: "Customer notification counts, read rates, and notice breakdown",
   },
 ];

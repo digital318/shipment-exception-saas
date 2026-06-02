@@ -2,7 +2,7 @@ import type { ReportId, OperationsSummaryReport } from "./types";
 import { REPORT_DEFINITIONS } from "./types";
 import { buildReportData } from "./build-reports";
 import type { ReportFilters } from "./types";
-import type { Customer, ExceptionRecord, Shipment } from "@/lib/types";
+import type { Customer, CustomerNotificationRecord, ExceptionRecord, Shipment } from "@/lib/types";
 import { dateStamp } from "@/lib/export/csv-utils";
 
 function escapeHtml(value: string): string {
@@ -37,10 +37,18 @@ function buildReportHtml(
   shipments: Shipment[],
   exceptions: ExceptionRecord[],
   filters: ReportFilters,
+  customerNotifications: CustomerNotificationRecord[] = [],
 ): string {
   const def = REPORT_DEFINITIONS.find((r) => r.id === reportId);
   const title = def?.title ?? reportId;
-  const data = buildReportData(reportId, customers, shipments, exceptions, filters);
+  const data = buildReportData(
+    reportId,
+    customers,
+    shipments,
+    exceptions,
+    filters,
+    customerNotifications,
+  );
   let body = "";
 
   switch (reportId) {
@@ -198,6 +206,46 @@ function buildReportHtml(
       );
       break;
     }
+    case "customer-communication": {
+      const d = data as {
+        totalNotifications: number;
+        unreadCount: number;
+        readRatePercent: number;
+        delayNotices: number;
+        resolutionNotices: number;
+        exceptionNotices: number;
+        slaWarnings: number;
+        byCustomer: {
+          customerName: string;
+          total: number;
+          unread: number;
+          readRatePercent: number;
+          delayNotices: number;
+          resolutionNotices: number;
+        }[];
+      };
+      body = renderKeyValuePairs([
+        ["Total Notifications", String(d.totalNotifications)],
+        ["Unread", String(d.unreadCount)],
+        ["Read Rate", `${d.readRatePercent}%`],
+        ["Delay Notices", String(d.delayNotices)],
+        ["Resolution Notices", String(d.resolutionNotices)],
+        ["Exception Notices", String(d.exceptionNotices)],
+        ["SLA Warnings", String(d.slaWarnings)],
+      ]);
+      body += renderTable(
+        ["Customer", "Total", "Unread", "Read Rate", "Delays", "Resolutions"],
+        d.byCustomer.map((r) => [
+          r.customerName,
+          String(r.total),
+          String(r.unread),
+          `${r.readRatePercent}%`,
+          String(r.delayNotices),
+          String(r.resolutionNotices),
+        ]),
+      );
+      break;
+    }
   }
 
   const filterSummary = [
@@ -241,8 +289,16 @@ export function exportReportPdf(
   shipments: Shipment[],
   exceptions: ExceptionRecord[],
   filters: ReportFilters,
+  customerNotifications: CustomerNotificationRecord[] = [],
 ): void {
-  const html = buildReportHtml(reportId, customers, shipments, exceptions, filters);
+  const html = buildReportHtml(
+    reportId,
+    customers,
+    shipments,
+    exceptions,
+    filters,
+    customerNotifications,
+  );
   const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(html);

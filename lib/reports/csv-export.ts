@@ -2,6 +2,7 @@ import { dateStamp, downloadCsv, rowsToCsv } from "@/lib/export/csv-utils";
 import type { ReportId } from "./types";
 import {
   buildCarrierPerformanceReport,
+  buildCustomerCommunicationReport,
   buildCustomerSlaReport,
   buildEscalationReport,
   buildExceptionReport,
@@ -9,7 +10,7 @@ import {
   buildOperationsSummaryReport,
 } from "./build-reports";
 import type { ReportFilters } from "./types";
-import type { Customer, ExceptionRecord, Shipment } from "@/lib/types";
+import type { Customer, CustomerNotificationRecord, ExceptionRecord, Shipment } from "@/lib/types";
 
 function slug(name: string): string {
   return name.replace(/\s+/g, "-").toLowerCase();
@@ -21,6 +22,7 @@ export function exportReportCsv(
   shipments: Shipment[],
   exceptions: ExceptionRecord[],
   filters: ReportFilters,
+  customerNotifications: CustomerNotificationRecord[] = [],
 ): void {
   const stamp = dateStamp();
   let filename = `freightpulse-${reportId}-${stamp}.csv`;
@@ -147,6 +149,33 @@ export function exportReportCsv(
           String(r.averageDelayHours),
           r.healthStatus,
         ]),
+      );
+      break;
+    }
+    case "customer-communication": {
+      const data = buildCustomerCommunicationReport(customerNotifications, filters);
+      const summaryRows: string[][] = [
+        ["Total Notifications", String(data.totalNotifications)],
+        ["Unread", String(data.unreadCount)],
+        ["Read Rate %", String(data.readRatePercent)],
+        ["Delay Notices", String(data.delayNotices)],
+        ["Resolution Notices", String(data.resolutionNotices)],
+        ["Exception Notices", String(data.exceptionNotices)],
+        ["SLA Warnings", String(data.slaWarnings)],
+      ];
+      const customerRows = data.byCustomer.map((r) => [
+        r.customerName,
+        String(r.total),
+        String(r.unread),
+        String(r.readRatePercent),
+        String(r.delayNotices),
+        String(r.resolutionNotices),
+      ]);
+      csv = rowsToCsv(["Metric", "Value"], summaryRows);
+      csv += "\n\n";
+      csv += rowsToCsv(
+        ["Customer", "Total", "Unread", "Read Rate %", "Delay Notices", "Resolution Notices"],
+        customerRows,
       );
       break;
     }

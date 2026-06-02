@@ -38,6 +38,7 @@ const navItems = [
   { label: "Playbooks", href: "/playbooks", icon: IconPlaybook },
   { label: "Customers", href: "/customers", icon: IconUsers },
   { label: "Customer Portal", href: "/portal", icon: IconPortal },
+  { label: "Customer Notifications", href: "/customer-notifications", icon: IconBell },
   { label: "Carriers", href: "/carriers", icon: IconTruck },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
   { label: "Reports", href: "/reports", icon: IconFileText },

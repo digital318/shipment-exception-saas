@@ -6,8 +6,9 @@ import {
   computeExecutiveMetrics,
   countExceptionsCreatedLast7Days,
 } from "@/lib/services/metrics-service";
-import type { Customer, ExceptionRecord, Shipment } from "@/lib/types";
+import type { Customer, ExceptionRecord, Shipment, CustomerNotificationRecord } from "@/lib/types";
 import { computeCarrierPerformanceRows } from "./carrier-performance";
+import { CUSTOMER_NOTIFICATION_TYPE_LABELS } from "@/lib/data/customer-notification-rules";
 import type { ReportFilters } from "./types";
 import { filterExceptions, filterShipments } from "./filters";
 
@@ -149,12 +150,101 @@ export function buildCarrierPerformanceReport(
   return rows;
 }
 
+export function buildCustomerCommunicationReport(
+  notifications: CustomerNotificationRecord[],
+  filters: ReportFilters,
+) {
+  let filtered = notifications;
+  if (filters.customer !== "All") {
+    filtered = filtered.filter((n) => n.customerName === filters.customer);
+  }
+
+  const totalNotifications = filtered.length;
+  const unreadCount = filtered.filter((n) => n.status === "Unread").length;
+  const readCount = totalNotifications - unreadCount;
+  const readRatePercent =
+    totalNotifications > 0 ? Math.round((readCount / totalNotifications) * 1000) / 10 : 100;
+
+  const delayNotices = filtered.filter((n) => n.type === "shipment_delayed").length;
+  const resolutionNotices = filtered.filter((n) => n.type === "exception_resolved").length;
+  const exceptionNotices = filtered.filter(
+    (n) => n.type === "shipment_exception" || n.type === "exception_updated",
+  ).length;
+  const slaWarnings = filtered.filter((n) => n.type === "sla_risk_warning").length;
+
+  const customerMap = new Map<
+    string,
+    {
+      customerName: string;
+      total: number;
+      unread: number;
+      delayNotices: number;
+      resolutionNotices: number;
+    }
+  >();
+
+  for (const notification of filtered) {
+    const name = notification.customerName ?? "Unknown customer";
+    const current = customerMap.get(name) ?? {
+      customerName: name,
+      total: 0,
+      unread: 0,
+      delayNotices: 0,
+      resolutionNotices: 0,
+    };
+    current.total += 1;
+    if (notification.status === "Unread") current.unread += 1;
+    if (notification.type === "shipment_delayed") current.delayNotices += 1;
+    if (notification.type === "exception_resolved") current.resolutionNotices += 1;
+    customerMap.set(name, current);
+  }
+
+  const byCustomer = [...customerMap.values()]
+    .map((row) => ({
+      ...row,
+      readRatePercent:
+        row.total > 0
+          ? Math.round(((row.total - row.unread) / row.total) * 1000) / 10
+          : 100,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const typeCounts = new Map<string, number>();
+  for (const notification of filtered) {
+    typeCounts.set(notification.type, (typeCounts.get(notification.type) ?? 0) + 1);
+  }
+
+  const byType = [...typeCounts.entries()]
+    .map(([type, count]) => ({
+      type,
+      label:
+        CUSTOMER_NOTIFICATION_TYPE_LABELS[
+          type as keyof typeof CUSTOMER_NOTIFICATION_TYPE_LABELS
+        ] ?? type,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    totalNotifications,
+    unreadCount,
+    readRatePercent,
+    delayNotices,
+    resolutionNotices,
+    exceptionNotices,
+    slaWarnings,
+    byCustomer,
+    byType,
+  };
+}
+
 export function buildReportData(
   reportId: string,
   customers: Customer[],
   shipments: Shipment[],
   exceptions: ExceptionRecord[],
   filters: ReportFilters,
+  customerNotifications: CustomerNotificationRecord[] = [],
 ) {
   switch (reportId) {
     case "operations-summary":
@@ -169,6 +259,8 @@ export function buildReportData(
       return buildEscalationReport(exceptions, filters);
     case "carrier-performance":
       return buildCarrierPerformanceReport(shipments, exceptions, filters);
+    case "customer-communication":
+      return buildCustomerCommunicationReport(customerNotifications, filters);
     default:
       return null;
   }

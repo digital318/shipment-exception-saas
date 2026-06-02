@@ -18,6 +18,9 @@ import {
   buildExceptionNotificationInput,
 } from "./notification-rules";
 import { createNotification } from "./notifications";
+import {
+  notifyCustomerOnExceptionCreated,
+} from "./customer-notification-triggers";
 
 export type DetectionRunResult = {
   created: ExceptionDetectionResult[];
@@ -36,6 +39,8 @@ async function notifyRpcDetections(
   organizationId: string,
   rows: RpcDetectionRow[],
 ): Promise<void> {
+  const supabase = getSupabaseClient();
+
   for (const row of rows) {
     const input = buildExceptionNotificationInput(organizationId, {
       exceptionId: row.exception_id,
@@ -49,6 +54,26 @@ async function notifyRpcDetections(
       await createNotification(input);
     } catch {
       // Non-blocking for detection pipeline.
+    }
+
+    const { data: shipment } = await supabase
+      .from("shipments")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("shipment_number", row.shipment_number)
+      .maybeSingle();
+
+    if (shipment?.id) {
+      try {
+        await notifyCustomerOnExceptionCreated(
+          organizationId,
+          row.exception_id,
+          shipment.id,
+          row.title,
+        );
+      } catch {
+        // Non-blocking for detection pipeline.
+      }
     }
   }
 }

@@ -23,6 +23,11 @@ import {
   buildResolutionNotificationInput,
 } from "./notification-rules";
 import { createNotification } from "./notifications";
+import { lookupShipmentCustomerContext } from "./customer-notifications";
+import {
+  notifyCustomerOnExceptionCreated,
+  notifyCustomerOnExceptionStatusChange,
+} from "./customer-notification-triggers";
 
 export type ExceptionMutationContext = {
   shipmentId: string;
@@ -201,6 +206,13 @@ export async function createExceptionInSupabase(
     input.severity,
   );
 
+  await notifyCustomerOnExceptionCreated(
+    organizationId,
+    data.id,
+    shipmentUuid,
+    input.title.trim(),
+  );
+
   return data.id;
 }
 
@@ -266,6 +278,15 @@ export async function createAutoDetectedExceptionInSupabase(
     input.title.trim(),
     input.severity,
   );
+
+  if (input.shipmentUuid) {
+    await notifyCustomerOnExceptionCreated(
+      organizationId,
+      data.id,
+      input.shipmentUuid,
+      input.title.trim(),
+    );
+  }
 
   return data.id;
 }
@@ -336,6 +357,13 @@ export async function createCarrierSyncExceptionInSupabase(
     // Notification failure should not block carrier sync.
   }
 
+  await notifyCustomerOnExceptionCreated(
+    organizationId,
+    data.id,
+    input.shipmentUuid,
+    input.title.trim(),
+  );
+
   return data.id;
 }
 
@@ -393,6 +421,30 @@ export async function updateExceptionInSupabase(
       "update",
       `Status changed to ${patch.status} on ${context.shipmentId} — ${context.title}`,
     );
+  }
+
+  if (patch.status !== undefined && patch.status !== context.previousStatus) {
+    const shipmentUuid = await lookupShipmentUuid(context.shipmentId, organizationId);
+    if (shipmentUuid) {
+      const customerCtx = await lookupShipmentCustomerContext(shipmentUuid, organizationId);
+      if (customerCtx) {
+        try {
+          await notifyCustomerOnExceptionStatusChange(
+            organizationId,
+            dbId,
+            shipmentUuid,
+            customerCtx.shipmentNumber,
+            customerCtx.customerId,
+            customerCtx.customerName,
+            context.title,
+            patch.status,
+            context.previousStatus,
+          );
+        } catch {
+          // Customer notification failure should not block exception writes.
+        }
+      }
+    }
   }
 }
 

@@ -13,6 +13,8 @@ const INTERNAL_ACTIVITY_TYPES: ActivityType[] = [
   "overdue_follow_up",
   "customer_risk",
   "sla_breach",
+  "customer_notification_created",
+  "customer_notification_read",
 ];
 
 const INTERNAL_ACTIVITY_KEYWORDS = [

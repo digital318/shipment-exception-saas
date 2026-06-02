@@ -1,8 +1,10 @@
 "use client";
 
 import { DashboardShell } from "@/components/dashboard-shell";
+import { CustomerNotificationBell } from "@/components/customer-notifications/customer-notification-bell";
 import { CustomerSelector } from "@/components/portal/customer-selector";
-import { PortalActivityFeed } from "@/components/portal/portal-activity-feed";
+import { PortalCommunicationHistory } from "@/components/portal/portal-communication-history";
+import { PortalCustomerTimeline } from "@/components/portal/portal-customer-timeline";
 import { PortalExceptionsTable } from "@/components/portal/portal-exceptions-table";
 import { PortalMetricsGrid } from "@/components/portal/portal-metrics-grid";
 import { PortalReportsSection } from "@/components/portal/portal-reports-section";
@@ -10,8 +12,10 @@ import { PortalShipmentsTable } from "@/components/portal/portal-shipments-table
 import { PortalSlaScorecard } from "@/components/portal/portal-sla-scorecard";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { SyncStatus } from "@/components/ui/sync-status";
+import { useCustomerNotifications } from "@/context/customer-notifications-context";
 import { useCustomerPortalData } from "@/hooks/use-customer-portal-data";
-import { badgeBase, cardSurface } from "@/lib/styles";
+import { btnPrimary, badgeBase, cardSurface } from "@/lib/styles";
+import { useState } from "react";
 
 export function PortalPage() {
   const {
@@ -20,6 +24,8 @@ export function PortalPage() {
     customerShipments,
     openExceptions,
     customerActivity,
+    customerNotifications,
+    customerTimeline,
     dashboard,
     scorecard,
     loading,
@@ -27,8 +33,20 @@ export function PortalPage() {
     refresh,
     source,
   } = useCustomerPortalData();
+  const { markRead, generateDemoNotification } = useCustomerNotifications();
+  const [generating, setGenerating] = useState(false);
 
   const syncState = loading ? "syncing" : error && source === "mock" ? "error" : "live";
+
+  const handleGenerateDemo = async () => {
+    if (!customer) return;
+    setGenerating(true);
+    try {
+      await generateDemoNotification(customer.dbId ?? customer.id, customer.name);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <DashboardShell
@@ -44,6 +62,15 @@ export function PortalPage() {
       actions={
         <>
           <CustomerSelector />
+          {customer && <CustomerNotificationBell customerId={customer.dbId ?? customer.id} />}
+          <button
+            type="button"
+            onClick={() => void handleGenerateDemo()}
+            disabled={!customer || generating}
+            className={btnPrimary}
+          >
+            {generating ? "Generating…" : "Generate Customer Alert"}
+          </button>
           <SyncStatus state={syncState} />
         </>
       }
@@ -76,8 +103,14 @@ export function PortalPage() {
             <div className="space-y-8">
               <PortalShipmentsTable shipments={customerShipments} />
               <PortalExceptionsTable exceptions={openExceptions} />
+              <div id="communication-history">
+                <PortalCommunicationHistory
+                  notifications={customerNotifications}
+                  onMarkRead={(id) => void markRead(id)}
+                />
+              </div>
             </div>
-            <PortalActivityFeed activity={customerActivity} />
+            <PortalCustomerTimeline items={customerTimeline} />
           </div>
 
           <PortalSlaScorecard scorecard={scorecard} />

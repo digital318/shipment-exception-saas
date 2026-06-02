@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useCustomerNotifications } from "@/context/customer-notifications-context";
 import { useExceptions } from "@/context/exceptions-context";
 import { useOrganization } from "@/context/organization-context";
 import { buildReportData } from "@/lib/reports/build-reports";
@@ -9,12 +10,21 @@ import type { ReportFilters, ReportId } from "@/lib/reports/types";
 
 export function useReportData(reportId: ReportId, filters: ReportFilters = DEFAULT_REPORT_FILTERS) {
   const { customers, shipments, exceptions, loading, error, refresh } = useExceptions();
+  const { notifications: customerNotifications } = useCustomerNotifications();
   const { organization, profile } = useOrganization();
   const organizationId = organization?.id ?? profile?.organizationId;
 
   const data = useMemo(
-    () => buildReportData(reportId, customers, shipments, exceptions, filters),
-    [reportId, customers, shipments, exceptions, filters],
+    () =>
+      buildReportData(
+        reportId,
+        customers,
+        shipments,
+        exceptions,
+        filters,
+        customerNotifications,
+      ),
+    [reportId, customers, shipments, exceptions, filters, customerNotifications],
   );
 
   const filteredExceptionCount = useMemo(

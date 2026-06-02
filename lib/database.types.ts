@@ -126,3 +126,41 @@ export type DbNotificationWithRelations = DbNotification & {
   } | null;
   customer: Pick<DbCustomer, "id" | "name"> | null;
 };
+
+export type DbCustomerNotification = {
+  id: string;
+  organization_id: string;
+  customer_id: string;
+  shipment_id: string | null;
+  exception_id: string | null;
+  type: string;
+  title: string;
+  message: string;
+  status: string;
+  created_at: string;
+  read_at: string | null;
+};
+
+/** Row shape for INSERT into public.customer_notifications */
+export type DbCustomerNotificationInsert = {
+  organization_id: string;
+  customer_id: string;
+  shipment_id?: string | null;
+  exception_id?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  status?: string;
+};
+
+/** Row shape for UPDATE on public.customer_notifications */
+export type DbCustomerNotificationUpdate = {
+  status?: string;
+  read_at?: string | null;
+};
+
+export type DbCustomerNotificationWithRelations = DbCustomerNotification & {
+  customer: Pick<DbCustomer, "id" | "name"> | null;
+  shipment: Pick<DbShipment, "id" | "shipment_number"> | null;
+  exception: Pick<DbException, "id" | "title"> | null;
+};
