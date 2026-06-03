@@ -182,7 +182,10 @@ export type ActivityType =
   | "report_generated"
   | "report_exported"
   | "customer_notification_created"
-  | "customer_notification_read";
+  | "customer_notification_read"
+  | "plan_change"
+  | "user_invited"
+  | "organization_updated";
 
 export type ActivityItem = {
   time: string;

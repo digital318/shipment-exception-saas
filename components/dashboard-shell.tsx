@@ -8,6 +8,8 @@ import {
   IconBarChart,
   IconBell,
   IconBriefcase,
+  IconBuilding,
+  IconCreditCard,
   IconFileText,
   IconLayoutDashboard,
   IconLogo,
@@ -42,6 +44,9 @@ const navItems = [
   { label: "Carriers", href: "/carriers", icon: IconTruck },
   { label: "Analytics", href: "/analytics", icon: IconBarChart },
   { label: "Reports", href: "/reports", icon: IconFileText },
+  { label: "Billing", href: "/billing", icon: IconCreditCard },
+  { label: "Users", href: "/users", icon: IconUsers },
+  { label: "Organization Settings", href: "/organization-settings", icon: IconBuilding },
   { label: "Settings", href: "/settings", icon: IconSettings },
 ];
 
@@ -160,15 +165,15 @@ export function DashboardShell({
               <SupabaseStatus />
             </div>
             <div className="rounded-xl bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4 ring-1 ring-white/[0.06]">
-              <p className="text-xs font-semibold text-zinc-200">Enterprise SLA</p>
+              <p className="text-xs font-semibold text-zinc-200">Subscription</p>
               <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                Auto-escalation, carrier API sync, and custom playbooks enabled.
+                Manage your plan, usage, and team access.
               </p>
               <Link
-                href="/playbooks"
+                href="/billing"
                 className={`mt-4 block w-full text-center ${btnSecondary} !bg-white !text-zinc-900 hover:!bg-zinc-100`}
               >
-                View Playbooks
+                View Billing
               </Link>
             </div>
           </div>

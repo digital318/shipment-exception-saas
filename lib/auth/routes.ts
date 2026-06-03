@@ -2,7 +2,7 @@ export const AUTH_ROUTES = ["/login", "/signup"] as const;
 
 export const ONBOARDING_ROUTE = "/onboarding";
 
-export const PUBLIC_PATH_PREFIXES = ["/login", "/signup", "/api"] as const;
+export const PUBLIC_PATH_PREFIXES = ["/login", "/signup", "/pricing", "/api"] as const;
 
 export function isAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some(

@@ -105,6 +105,7 @@ type ExceptionsContextValue = {
     message: string,
     type: "report_generated" | "report_exported",
   ) => void;
+  logSaasActivity: (message: string, type: ActivityItem["type"]) => void;
 };
 
 const ExceptionsContext = createContext<ExceptionsContextValue | null>(null);
@@ -200,6 +201,19 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const logSaasActivity = useCallback((message: string, type: ActivityItem["type"]) => {
+    setActivity((act) => [
+      {
+        time: formatNowLabel(),
+        actor: CURRENT_USER,
+        event: message,
+        shipmentId: null,
+        type,
+      },
+      ...act,
+    ]);
+  }, []);
 
   const loadData = useCallback(async (options?: LoadOptions): Promise<AppDataSnapshot> => {
     if (!options?.silent) {
@@ -883,6 +897,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       syncCarriers,
       simulateCarrierException: simulateCarrierExceptionAction,
       logReportActivity,
+      logSaasActivity,
     }),
     [
       shipments,
@@ -912,6 +927,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       syncCarriers,
       simulateCarrierExceptionAction,
       logReportActivity,
+      logSaasActivity,
     ],
   );
 

@@ -200,3 +200,23 @@ export function IconFileText({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconCreditCard({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <rect x="1" y="4" width="22" height="16" rx="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  );
+}
+
+export function IconBuilding({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" />
+      <line x1="9" y1="9" x2="9" y2="9.01" />
+      <line x1="9" y1="13" x2="9" y2="13.01" />
+      <line x1="9" y1="17" x2="9" y2="17.01" />
+    </svg>
+  );
+}

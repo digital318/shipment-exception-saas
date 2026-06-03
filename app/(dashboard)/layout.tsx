@@ -4,6 +4,7 @@ import { CustomerPortalProvider } from "@/context/customer-portal-context";
 import { ExceptionsProvider } from "@/context/exceptions-context";
 import { NotificationsProvider } from "@/context/notifications-context";
 import { CarrierProvider } from "@/context/carrier-context";
+import { SubscriptionProvider } from "@/context/subscription-context";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,7 +12,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <NotificationsProvider>
         <CustomerNotificationsProvider>
           <CarrierProvider>
-            <CustomerPortalProvider>{children}</CustomerPortalProvider>
+            <CustomerPortalProvider>
+              <SubscriptionProvider>{children}</SubscriptionProvider>
+            </CustomerPortalProvider>
           </CarrierProvider>
         </CustomerNotificationsProvider>
       </NotificationsProvider>
