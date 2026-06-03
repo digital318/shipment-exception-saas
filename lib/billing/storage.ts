@@ -1,7 +1,9 @@
+import { DEMO_USERS } from "@/lib/auth/roles";
 import type {
   OrganizationSettings,
   SubscriptionState,
   TeamMember,
+  TeamMemberOverride,
   UserInvitation,
   UserRole,
 } from "./types";
@@ -9,6 +11,9 @@ import type {
 const SUBSCRIPTION_KEY = "freightpulse:subscription";
 const INVITATIONS_KEY = "freightpulse:invitations";
 const ORG_SETTINGS_KEY = "freightpulse:org-settings";
+const TEAM_OVERRIDES_KEY = "freightpulse:team-overrides";
+
+const INVITATION_EXPIRY_DAYS = 14;
 
 function storageKey(base: string, orgId: string): string {
   return `${base}:${orgId}`;
@@ -51,36 +56,14 @@ export function defaultOrganizationSettings(): OrganizationSettings {
   };
 }
 
-export const DEFAULT_TEAM: TeamMember[] = [
-  {
-    id: "user-1",
-    name: "Sarah Chen",
-    email: "sarah.chen@freightpulse.io",
-    role: "Admin",
-    status: "active",
-  },
-  {
-    id: "user-2",
-    name: "Marcus Webb",
-    email: "marcus.webb@freightpulse.io",
-    role: "Operations Manager",
-    status: "active",
-  },
-  {
-    id: "user-3",
-    name: "Lisa Park",
-    email: "lisa.park@freightpulse.io",
-    role: "Customer Success",
-    status: "active",
-  },
-  {
-    id: "user-4",
-    name: "James Ortiz",
-    email: "james.ortiz@freightpulse.io",
-    role: "Viewer",
-    status: "active",
-  },
-];
+export const DEFAULT_TEAM: TeamMember[] = DEMO_USERS.map((u) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  status: "active" as const,
+  customerAccount: u.customerAccount,
+}));
 
 export function loadSubscription(orgId: string): SubscriptionState {
   return readJson(storageKey(SUBSCRIPTION_KEY, orgId), defaultSubscriptionState());
@@ -91,11 +74,23 @@ export function saveSubscription(orgId: string, state: SubscriptionState): void 
 }
 
 export function loadInvitations(orgId: string): UserInvitation[] {
-  return readJson(storageKey(INVITATIONS_KEY, orgId), []);
+  const invites = readJson<UserInvitation[]>(storageKey(INVITATIONS_KEY, orgId), []);
+  return invites.map(refreshInvitationStatus);
 }
 
 export function saveInvitations(orgId: string, invitations: UserInvitation[]): void {
   writeJson(storageKey(INVITATIONS_KEY, orgId), invitations);
+}
+
+export function loadTeamOverrides(orgId: string): Record<string, TeamMemberOverride> {
+  return readJson(storageKey(TEAM_OVERRIDES_KEY, orgId), {});
+}
+
+export function saveTeamOverrides(
+  orgId: string,
+  overrides: Record<string, TeamMemberOverride>,
+): void {
+  writeJson(storageKey(TEAM_OVERRIDES_KEY, orgId), overrides);
 }
 
 export function loadOrganizationSettings(orgId: string): OrganizationSettings {
@@ -112,31 +107,72 @@ export function computeTrialDaysRemaining(state: SubscriptionState): number {
   return Math.max(0, state.trialDaysTotal - elapsed);
 }
 
+export function refreshInvitationStatus(invite: UserInvitation): UserInvitation {
+  if (invite.status === "Accepted") return invite;
+  const invited = new Date(invite.invitedAt).getTime();
+  const elapsedDays = Math.floor((Date.now() - invited) / (1000 * 60 * 60 * 24));
+  if (elapsedDays >= INVITATION_EXPIRY_DAYS) {
+    return { ...invite, status: "Expired" };
+  }
+  return { ...invite, status: "Pending" };
+}
+
 export function invitationToMember(invite: UserInvitation): TeamMember {
-  const name = invite.email.split("@")[0].replace(/[._]/g, " ");
-  const formatted = name
-    .split(" ")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  const status =
+    invite.status === "Accepted"
+      ? ("active" as const)
+      : invite.status === "Expired"
+        ? ("pending" as const)
+        : ("pending" as const);
   return {
     id: invite.id,
-    name: formatted,
+    name: invite.name,
     email: invite.email,
     role: invite.role,
-    status: "invited",
+    status,
   };
 }
 
 export function createInvitation(
+  name: string,
   email: string,
   role: UserRole,
   invitedBy: string,
 ): UserInvitation {
   return {
     id: `inv-${Date.now()}`,
-    email,
+    name: name.trim(),
+    email: email.trim(),
     role,
+    status: "Pending",
     invitedAt: new Date().toISOString(),
     invitedBy,
   };
+}
+
+export function applyTeamOverrides(
+  members: TeamMember[],
+  overrides: Record<string, TeamMemberOverride>,
+): TeamMember[] {
+  return members.map((m) => {
+    const o = overrides[m.id];
+    if (!o) return m;
+    return {
+      ...m,
+      role: o.role ?? m.role,
+      status: o.status ?? m.status,
+    };
+  });
+}
+
+export function mergeTeamWithInvitations(
+  baseTeam: TeamMember[],
+  invitations: UserInvitation[],
+  overrides: Record<string, TeamMemberOverride>,
+): TeamMember[] {
+  const pendingInvites = invitations
+    .filter((i) => i.status === "Pending")
+    .map(invitationToMember);
+  const merged = applyTeamOverrides([...baseTeam, ...pendingInvites], overrides);
+  return merged;
 }

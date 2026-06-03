@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { useAuthRole } from "@/context/auth-role-context";
 import { useOrganization } from "@/context/organization-context";
 import {
   useOrganizationDisplayName,
@@ -19,6 +20,7 @@ const INDUSTRIES = [
 ];
 
 export function OrganizationSettingsPage() {
+  const { isAdmin } = useAuthRole();
   const { organization, loading, saveOrganization } = useOrganization();
   const { orgSettings, updateOrgSettings } = useSubscription();
   const displayName = useOrganizationDisplayName();
@@ -76,6 +78,20 @@ export function OrganizationSettingsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (!isAdmin) {
+    return (
+      <DashboardShell
+        eyebrow="Organization profile"
+        title="Organization Settings"
+        description="Admin access required"
+      >
+        <p className="text-sm text-zinc-500">
+          Only organization administrators can change organization settings.
+        </p>
+      </DashboardShell>
+    );
   }
 
   return (

@@ -6,6 +6,7 @@ import { PlaybookPanel } from "@/components/exceptions/playbook-panel";
 import { IconX } from "@/components/icons";
 import { useExceptions } from "@/context/exceptions-context";
 import { useToast } from "@/context/toast-context";
+import { useMutationGuard } from "@/hooks/use-mutation-guard";
 import { EXCEPTION_OWNERS, ISSUE_STATUSES } from "@/lib/constants";
 import {
   enrichShipmentWithException,
@@ -45,6 +46,7 @@ export function ExceptionDetailDrawer({
     escalatePlaybook,
   } = useExceptions();
   const { toast } = useToast();
+  const { canMutate, guardProps } = useMutationGuard();
   const [noteDraft, setNoteDraft] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -73,7 +75,7 @@ export function ExceptionDetailDrawer({
   if (!isOpen) return null;
 
   async function handleAddNote() {
-    if (!exc) return;
+    if (!canMutate || !exc) return;
     if (noteDraft.trim().length < 3) {
       toast("Note must be at least 3 characters.", "error");
       return;
@@ -89,7 +91,7 @@ export function ExceptionDetailDrawer({
   }
 
   async function handleResolve() {
-    if (!exc) return;
+    if (!canMutate || !exc) return;
     try {
       await resolveException(exc.id);
       toast(`${exc.id} marked as resolved.`, "success");
@@ -165,9 +167,15 @@ export function ExceptionDetailDrawer({
                 noteDraft={noteDraft}
                 onNoteChange={setNoteDraft}
                 onAddNote={handleAddNote}
-                onCompleteFollowUp={() => completeFollowUp(exc.id)}
-                onEscalate={() => escalatePlaybook(exc.id)}
+                onCompleteFollowUp={async () => {
+                  if (canMutate) await completeFollowUp(exc.id);
+                }}
+                onEscalate={async () => {
+                  if (canMutate) await escalatePlaybook(exc.id);
+                }}
+                canMutate={canMutate}
                 onStatusChange={async (status) => {
+                  if (!canMutate) return;
                   try {
                     await updateStatus(exc.id, status);
                     toast(`Status updated to ${status}.`, "success");
@@ -178,6 +186,7 @@ export function ExceptionDetailDrawer({
                   }
                 }}
                 onOwnerChange={async (owner) => {
+                  if (!canMutate) return;
                   try {
                     await assignOwner(exc.id, owner);
                     toast(`Owner assigned to ${owner}.`, "success");
@@ -197,6 +206,7 @@ export function ExceptionDetailDrawer({
               <button
                 type="button"
                 onClick={handleResolve}
+                {...guardProps}
                 className={`w-full ${btnPrimary} !from-emerald-600 !to-teal-600`}
               >
                 Mark as resolved
@@ -243,6 +253,7 @@ function ExceptionEditView({
   onStatusChange,
   onOwnerChange,
   isResolved,
+  canMutate,
 }: {
   exc: ExceptionRecord;
   noteDraft: string;
@@ -253,12 +264,13 @@ function ExceptionEditView({
   onStatusChange: (s: ExceptionRecord["status"]) => void | Promise<void>;
   onOwnerChange: (owner: string) => void | Promise<void>;
   isResolved: boolean;
+  canMutate: boolean;
 }) {
   return (
     <div className="space-y-6">
       <PlaybookPanel
         exc={exc}
-        isResolved={isResolved}
+        isResolved={isResolved || !canMutate}
         onCompleteFollowUp={onCompleteFollowUp}
         onEscalate={onEscalate}
       />
@@ -279,7 +291,7 @@ function ExceptionEditView({
           <span className={sectionLabel}>Status</span>
           <select
             value={exc.status}
-            disabled={isResolved}
+            disabled={isResolved || !canMutate}
             onChange={(e) =>
               onStatusChange(e.target.value as ExceptionRecord["status"])
             }
@@ -297,7 +309,7 @@ function ExceptionEditView({
           <span className={sectionLabel}>Owner</span>
           <select
             value={exc.owner}
-            disabled={isResolved}
+            disabled={isResolved || !canMutate}
             onChange={(e) => onOwnerChange(e.target.value)}
             className={`${selectBase} mt-2 w-full disabled:cursor-not-allowed disabled:opacity-50`}
           >
@@ -312,7 +324,7 @@ function ExceptionEditView({
 
       <div className="border-t border-white/[0.06] pt-5">
         <span className={sectionLabel}>Internal notes</span>
-        {!isResolved && (
+        {!isResolved && canMutate && (
           <div className="mt-3 space-y-2">
             <textarea
               value={noteDraft}

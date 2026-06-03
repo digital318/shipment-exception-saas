@@ -1,4 +1,4 @@
-import { CURRENT_USER } from "@/lib/constants";
+import { getCurrentActor } from "@/lib/auth/session";
 import {
   assignPlaybook,
   computeNextFollowUp,
@@ -148,7 +148,7 @@ export function isSupabaseWriteEnabled(): boolean {
 export async function createExceptionInSupabase(
   input: CreateExceptionInput,
   organizationId: string,
-  actor = CURRENT_USER,
+  actor = getCurrentActor(),
 ): Promise<string> {
   const shipmentUuid = await lookupShipmentUuid(input.shipmentId, organizationId);
   if (!shipmentUuid) {
@@ -517,7 +517,7 @@ export async function completeFollowUpInSupabase(
   dbId: string,
   context: ExceptionMutationContext,
   organizationId: string,
-  actor = CURRENT_USER,
+  actor = getCurrentActor(),
 ): Promise<void> {
   if (!context.severity) {
     throw new Error("Severity is required to schedule the next follow-up.");
@@ -544,7 +544,7 @@ export async function escalatePlaybookInSupabase(
   dbId: string,
   context: ExceptionMutationContext,
   organizationId: string,
-  actor = CURRENT_USER,
+  actor = getCurrentActor(),
 ): Promise<void> {
   const currentLevel = (context.escalationLevel ?? 1) as EscalationLevel;
   const nextLevel = nextEscalationLevel(currentLevel);

@@ -26,29 +26,31 @@ import { UserMenu } from "@/components/auth/user-menu";
 import { OrganizationSelector } from "@/components/organization/organization-selector";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { SupabaseStatus } from "@/components/ui/supabase-status";
+import { useAuthRole } from "@/context/auth-role-context";
+import { getNavItemsForRole } from "@/lib/auth/permissions";
 import { badgeBase, btnSecondary, sectionLabel } from "@/lib/styles";
 import { useExceptions } from "@/context/exceptions-context";
 import { useNotifications } from "@/context/notifications-context";
 
-const navItems = [
-  { label: "Dashboard", href: "/", icon: IconLayoutDashboard },
-  { label: "Shipments", href: "/shipments", icon: IconPackage },
-  { label: "Exceptions", href: "/exceptions", icon: IconAlertTriangle },
-  { label: "Notifications", href: "/notifications", icon: IconBell },
-  { label: "Escalations", href: "/escalations", icon: IconZap },
-  { label: "Executive", href: "/executive", icon: IconBriefcase },
-  { label: "Playbooks", href: "/playbooks", icon: IconPlaybook },
-  { label: "Customers", href: "/customers", icon: IconUsers },
-  { label: "Customer Portal", href: "/portal", icon: IconPortal },
-  { label: "Customer Notifications", href: "/customer-notifications", icon: IconBell },
-  { label: "Carriers", href: "/carriers", icon: IconTruck },
-  { label: "Analytics", href: "/analytics", icon: IconBarChart },
-  { label: "Reports", href: "/reports", icon: IconFileText },
-  { label: "Billing", href: "/billing", icon: IconCreditCard },
-  { label: "Users", href: "/users", icon: IconUsers },
-  { label: "Organization Settings", href: "/organization-settings", icon: IconBuilding },
-  { label: "Settings", href: "/settings", icon: IconSettings },
-];
+const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Dashboard: IconLayoutDashboard,
+  Shipments: IconPackage,
+  Exceptions: IconAlertTriangle,
+  Notifications: IconBell,
+  Escalations: IconZap,
+  Executive: IconBriefcase,
+  Playbooks: IconPlaybook,
+  Customers: IconUsers,
+  "Customer Portal": IconPortal,
+  "Customer Notifications": IconBell,
+  Carriers: IconTruck,
+  Analytics: IconBarChart,
+  Reports: IconFileText,
+  Billing: IconCreditCard,
+  Users: IconUsers,
+  "Organization Settings": IconBuilding,
+  Settings: IconSettings,
+};
 
 export function DashboardShell({
   eyebrow,
@@ -64,8 +66,14 @@ export function DashboardShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const { role, isAdmin } = useAuthRole();
   const { openCount } = useExceptions();
   const { unreadCount } = useNotifications();
+
+  const navItems = getNavItemsForRole(role).map((item) => ({
+    ...item,
+    icon: NAV_ICONS[item.label] ?? IconLayoutDashboard,
+  }));
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#09090b] font-sans text-zinc-100">
@@ -164,18 +172,20 @@ export function DashboardShell({
             <div className="mb-3 flex justify-center">
               <SupabaseStatus />
             </div>
-            <div className="rounded-xl bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4 ring-1 ring-white/[0.06]">
-              <p className="text-xs font-semibold text-zinc-200">Subscription</p>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                Manage your plan, usage, and team access.
-              </p>
-              <Link
-                href="/billing"
-                className={`mt-4 block w-full text-center ${btnSecondary} !bg-white !text-zinc-900 hover:!bg-zinc-100`}
-              >
-                View Billing
-              </Link>
-            </div>
+            {isAdmin && (
+              <div className="rounded-xl bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4 ring-1 ring-white/[0.06]">
+                <p className="text-xs font-semibold text-zinc-200">Subscription</p>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                  Manage your plan, usage, and team access.
+                </p>
+                <Link
+                  href="/billing"
+                  className={`mt-4 block w-full text-center ${btnSecondary} !bg-white !text-zinc-900 hover:!bg-zinc-100`}
+                >
+                  View Billing
+                </Link>
+              </div>
+            )}
           </div>
         </aside>
 

@@ -2,15 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { IconX } from "@/components/icons";
-import type { UserRole } from "@/lib/billing/types";
+import { INVITABLE_ROLES, type UserRole } from "@/lib/auth/roles";
 import { btnPrimary, btnSecondary, inputBase, sectionLabel } from "@/lib/styles";
-
-const ROLES: UserRole[] = [
-  "Admin",
-  "Operations Manager",
-  "Customer Success",
-  "Viewer",
-];
 
 export function InviteUserModal({
   open,
@@ -19,14 +12,16 @@ export function InviteUserModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onInvite: (email: string, role: UserRole) => Promise<void>;
+  onInvite: (name: string, email: string, role: UserRole) => Promise<void>;
 }) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("Viewer");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setName("");
     setEmail("");
     setRole("Viewer");
     function onKey(e: KeyboardEvent) {
@@ -44,10 +39,10 @@ export function InviteUserModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!name.trim() || !email.trim()) return;
     setSubmitting(true);
     try {
-      await onInvite(email.trim(), role);
+      await onInvite(name.trim(), email.trim(), role);
       onClose();
     } finally {
       setSubmitting(false);
@@ -74,7 +69,7 @@ export function InviteUserModal({
               Invite user
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Demo mode — invitations are stored locally
+              Invitation status: Pending until accepted (expires in 14 days)
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:text-white">
@@ -83,6 +78,17 @@ export function InviteUserModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <label className="block">
+            <span className={sectionLabel}>Full name</span>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Jordan Lee"
+              className={`${inputBase} mt-2`}
+            />
+          </label>
           <label className="block">
             <span className={sectionLabel}>Email address</span>
             <input
@@ -101,7 +107,7 @@ export function InviteUserModal({
               onChange={(e) => setRole(e.target.value as UserRole)}
               className={`${inputBase} mt-2`}
             >
-              {ROLES.map((r) => (
+              {INVITABLE_ROLES.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>

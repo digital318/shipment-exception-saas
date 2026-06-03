@@ -185,7 +185,10 @@ export type ActivityType =
   | "customer_notification_read"
   | "plan_change"
   | "user_invited"
-  | "organization_updated";
+  | "organization_updated"
+  | "role_changed"
+  | "user_disabled"
+  | "user_reactivated";
 
 export type ActivityItem = {
   time: string;

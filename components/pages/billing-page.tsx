@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { useAuthRole } from "@/context/auth-role-context";
 import { PlanComparisonTable } from "@/components/billing/plan-comparison-table";
 import { UpgradePlanModal } from "@/components/billing/upgrade-plan-modal";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -27,6 +28,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export function BillingPage() {
+  const { isAdmin } = useAuthRole();
   const orgName = useOrganizationDisplayName();
   const {
     subscription,
@@ -41,6 +43,20 @@ export function BillingPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const maxTrend = Math.max(...usageTrends.map((t) => t.shipments), 1);
+
+  if (!isAdmin) {
+    return (
+      <DashboardShell
+        eyebrow="Subscription & usage"
+        title="Billing"
+        description="Admin access required"
+      >
+        <p className="text-sm text-zinc-500">
+          Only organization administrators can manage billing and subscriptions.
+        </p>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell

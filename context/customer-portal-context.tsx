@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuthRole } from "@/context/auth-role-context";
 import {
   DEFAULT_PORTAL_CUSTOMER,
   PORTAL_CUSTOMER_NAMES,
@@ -20,6 +21,8 @@ type CustomerPortalContextValue = {
   selectedCustomer: PortalCustomerName;
   setSelectedCustomer: (name: PortalCustomerName) => void;
   portalCustomerNames: readonly PortalCustomerName[];
+  /** Customer User accounts cannot switch customers. */
+  customerLocked: boolean;
 };
 
 const CustomerPortalContext = createContext<CustomerPortalContextValue | null>(null);
@@ -29,10 +32,17 @@ function isPortalCustomerName(value: string): value is PortalCustomerName {
 }
 
 export function CustomerPortalProvider({ children }: { children: ReactNode }) {
+  const { customerAccount, role } = useAuthRole();
+  const customerLocked = role === "Customer User" && customerAccount != null;
+
   const [selectedCustomer, setSelectedCustomerState] =
-    useState<PortalCustomerName>(DEFAULT_PORTAL_CUSTOMER);
+    useState<PortalCustomerName>(customerAccount ?? DEFAULT_PORTAL_CUSTOMER);
 
   useEffect(() => {
+    if (customerLocked && customerAccount) {
+      setSelectedCustomerState(customerAccount);
+      return;
+    }
     try {
       const stored = localStorage.getItem(PORTAL_CUSTOMER_STORAGE_KEY);
       if (stored && isPortalCustomerName(stored)) {
@@ -41,24 +51,29 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore storage errors in demo mode
     }
-  }, []);
+  }, [customerLocked, customerAccount]);
 
-  const setSelectedCustomer = useCallback((name: PortalCustomerName) => {
-    setSelectedCustomerState(name);
-    try {
-      localStorage.setItem(PORTAL_CUSTOMER_STORAGE_KEY, name);
-    } catch {
-      // ignore
-    }
-  }, []);
+  const setSelectedCustomer = useCallback(
+    (name: PortalCustomerName) => {
+      if (customerLocked) return;
+      setSelectedCustomerState(name);
+      try {
+        localStorage.setItem(PORTAL_CUSTOMER_STORAGE_KEY, name);
+      } catch {
+        // ignore
+      }
+    },
+    [customerLocked],
+  );
 
   const value = useMemo(
     () => ({
       selectedCustomer,
       setSelectedCustomer,
       portalCustomerNames: PORTAL_CUSTOMER_NAMES,
+      customerLocked,
     }),
-    [selectedCustomer, setSelectedCustomer],
+    [selectedCustomer, setSelectedCustomer, customerLocked],
   );
 
   return (

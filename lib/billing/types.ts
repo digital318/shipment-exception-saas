@@ -1,12 +1,14 @@
+import type {
+  InvitationStatus,
+  MemberStatus,
+  UserRole,
+} from "@/lib/auth/roles";
+
+export type { UserRole, MemberStatus, InvitationStatus };
+
 export type PlanId = "starter" | "professional" | "enterprise";
 
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
-
-export type UserRole =
-  | "Admin"
-  | "Operations Manager"
-  | "Customer Success"
-  | "Viewer";
 
 export type SubscriptionPlan = {
   id: PlanId;
@@ -37,15 +39,24 @@ export type TeamMember = {
   name: string;
   email: string;
   role: UserRole;
-  status: "active" | "invited";
+  status: MemberStatus | "pending";
+  /** Linked customer account for Customer User role. */
+  customerAccount?: string;
 };
 
 export type UserInvitation = {
   id: string;
+  name: string;
   email: string;
   role: UserRole;
+  status: InvitationStatus;
   invitedAt: string;
   invitedBy: string;
+};
+
+export type TeamMemberOverride = {
+  role?: UserRole;
+  status?: MemberStatus;
 };
 
 export type UsageMetrics = {

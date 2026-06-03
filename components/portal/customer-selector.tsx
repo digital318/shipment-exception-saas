@@ -5,7 +5,19 @@ import { badgeBase, selectBase } from "@/lib/styles";
 import type { PortalCustomerName } from "@/lib/customer-portal/constants";
 
 export function CustomerSelector() {
-  const { selectedCustomer, setSelectedCustomer, portalCustomerNames } = useCustomerPortal();
+  const { selectedCustomer, setSelectedCustomer, portalCustomerNames, customerLocked } =
+    useCustomerPortal();
+
+  if (customerLocked) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <span className="text-xs text-zinc-500">Customer account</span>
+        <span className={`${badgeBase} bg-violet-500/10 text-violet-300 ring-violet-500/20`}>
+          {selectedCustomer}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2.5">

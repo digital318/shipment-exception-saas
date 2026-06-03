@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuthRole } from "@/context/auth-role-context";
 import { useOrganization } from "@/context/organization-context";
 import { useExceptions } from "@/context/exceptions-context";
 import { useCustomerNotifications } from "@/context/customer-notifications-context";
@@ -18,13 +19,15 @@ import {
   computeTrialDaysRemaining,
   createInvitation,
   DEFAULT_TEAM,
-  invitationToMember,
   loadInvitations,
   loadOrganizationSettings,
   loadSubscription,
+  loadTeamOverrides,
+  mergeTeamWithInvitations,
   saveInvitations,
   saveOrganizationSettings,
   saveSubscription,
+  saveTeamOverrides,
 } from "@/lib/billing/storage";
 import type {
   OrganizationSettings,
@@ -36,10 +39,12 @@ import type {
 import {
   buildOrganizationUpdatedMessage,
   buildPlanChangeMessage,
+  buildRoleChangedMessage,
+  buildUserDisabledMessage,
   buildUserInvitedMessage,
+  buildUserReactivatedMessage,
   insertSaasActivityEvent,
 } from "@/lib/data/saas-activity";
-import { CURRENT_USER } from "@/lib/constants";
 import {
   computeGrowthMetrics,
   computePlanUtilization,
@@ -54,13 +59,17 @@ type SubscriptionContextValue = {
   trialDaysRemaining: number;
   orgSettings: OrganizationSettings;
   teamMembers: TeamMember[];
+  invitations: ReturnType<typeof loadInvitations>;
   usage: ReturnType<typeof computeUsageMetrics>;
   utilization: ReturnType<typeof computePlanUtilization>;
   usageTrends: ReturnType<typeof buildUsageTrends>;
   growthMetrics: ReturnType<typeof computeGrowthMetrics>;
   upgradePlan: (planId: PlanId) => Promise<void>;
-  inviteUser: (email: string, role: UserRole) => Promise<void>;
+  inviteUser: (name: string, email: string, role: UserRole) => Promise<void>;
   updateOrgSettings: (patch: Partial<OrganizationSettings>) => Promise<void>;
+  changeUserRole: (userId: string, role: UserRole) => Promise<void>;
+  disableUser: (userId: string) => Promise<void>;
+  reactivateUser: (userId: string) => Promise<void>;
 };
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
@@ -69,6 +78,7 @@ const DEMO_ORG_NAME = "FreightPulse Demo";
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { organization } = useOrganization();
+  const { actorName } = useAuthRole();
   const { shipments, exceptions, customers, activity, logSaasActivity } = useExceptions();
   const { notifications: customerNotifications } = useCustomerNotifications();
   const { toast } = useToast();
@@ -83,14 +93,44 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     loadOrganizationSettings(orgKey),
   );
   const [invitations, setInvitations] = useState(() => loadInvitations(orgKey));
+  const [teamOverrides, setTeamOverrides] = useState(() => loadTeamOverrides(orgKey));
 
   useEffect(() => {
     setSubscription(loadSubscription(orgKey));
     setOrgSettings(loadOrganizationSettings(orgKey));
     setInvitations(loadInvitations(orgKey));
+    setTeamOverrides(loadTeamOverrides(orgKey));
   }, [orgKey]);
 
   const anchorExceptionDbId = exceptions.find((e) => e.dbId)?.dbId;
+
+  const logAudit = useCallback(
+    async (
+      kind:
+        | "plan_change"
+        | "user_invited"
+        | "organization_updated"
+        | "role_changed"
+        | "user_disabled"
+        | "user_reactivated",
+      message: string,
+    ) => {
+      logSaasActivity(message, kind);
+      if (organizationId && anchorExceptionDbId) {
+        try {
+          await insertSaasActivityEvent(
+            organizationId,
+            anchorExceptionDbId,
+            kind,
+            message,
+          );
+        } catch {
+          // Non-blocking
+        }
+      }
+    },
+    [logSaasActivity, organizationId, anchorExceptionDbId],
+  );
 
   const currentPlan = useMemo(
     () => getPlanById(subscription.planId),
@@ -129,10 +169,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     [customers, shipments],
   );
 
-  const teamMembers = useMemo(() => {
-    const invited = invitations.map(invitationToMember);
-    return [...DEFAULT_TEAM, ...invited];
-  }, [invitations]);
+  const teamMembers = useMemo(
+    () => mergeTeamWithInvitations(DEFAULT_TEAM, invitations, teamOverrides),
+    [invitations, teamOverrides],
+  );
 
   const upgradePlan = useCallback(
     async (planId: PlanId) => {
@@ -149,59 +189,26 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       saveSubscription(orgKey, nextState);
 
       const message = buildPlanChangeMessage(previous.name, next.name);
-      logSaasActivity(message, "plan_change");
-
-      if (organizationId && anchorExceptionDbId) {
-        try {
-          await insertSaasActivityEvent(
-            organizationId,
-            anchorExceptionDbId,
-            "plan_change",
-            message,
-          );
-        } catch {
-          // Non-blocking
-        }
-      }
+      await logAudit("plan_change", message);
 
       toast(`Upgraded to ${next.name} plan`, "success");
     },
-    [
-      subscription,
-      orgKey,
-      logSaasActivity,
-      organizationId,
-      anchorExceptionDbId,
-      toast,
-    ],
+    [subscription, orgKey, logAudit, toast],
   );
 
   const inviteUser = useCallback(
-    async (email: string, role: UserRole) => {
-      const invite = createInvitation(email, role, CURRENT_USER);
+    async (name: string, email: string, role: UserRole) => {
+      const invite = createInvitation(name, email, role, actorName);
       const next = [...invitations, invite];
       setInvitations(next);
       saveInvitations(orgKey, next);
 
-      const message = buildUserInvitedMessage(email, role);
-      logSaasActivity(message, "user_invited");
-
-      if (organizationId && anchorExceptionDbId) {
-        try {
-          await insertSaasActivityEvent(
-            organizationId,
-            anchorExceptionDbId,
-            "user_invited",
-            message,
-          );
-        } catch {
-          // Non-blocking
-        }
-      }
+      const message = buildUserInvitedMessage(name, email, role);
+      await logAudit("user_invited", message);
 
       toast(`Invitation sent to ${email}`, "success");
     },
-    [invitations, orgKey, logSaasActivity, organizationId, anchorExceptionDbId, toast],
+    [invitations, orgKey, logAudit, toast, actorName],
   );
 
   const updateOrgSettings = useCallback(
@@ -212,22 +219,64 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       const changedField = Object.keys(patch)[0] ?? "settings";
       const message = buildOrganizationUpdatedMessage(changedField);
-      logSaasActivity(message, "organization_updated");
-
-      if (organizationId && anchorExceptionDbId) {
-        try {
-          await insertSaasActivityEvent(
-            organizationId,
-            anchorExceptionDbId,
-            "organization_updated",
-            message,
-          );
-        } catch {
-          // Non-blocking
-        }
-      }
+      await logAudit("organization_updated", message);
     },
-    [orgSettings, orgKey, logSaasActivity, organizationId, anchorExceptionDbId],
+    [orgSettings, orgKey, logAudit],
+  );
+
+  const changeUserRole = useCallback(
+    async (userId: string, role: UserRole) => {
+      const member = teamMembers.find((m) => m.id === userId);
+      if (!member) return;
+      const previousRole = member.role;
+      const nextOverrides = {
+        ...teamOverrides,
+        [userId]: { ...teamOverrides[userId], role },
+      };
+      setTeamOverrides(nextOverrides);
+      saveTeamOverrides(orgKey, nextOverrides);
+
+      const message = buildRoleChangedMessage(member.name, previousRole, role);
+      await logAudit("role_changed", message);
+      toast(`Updated ${member.name} to ${role}`, "success");
+    },
+    [teamMembers, teamOverrides, orgKey, logAudit, toast],
+  );
+
+  const disableUser = useCallback(
+    async (userId: string) => {
+      const member = teamMembers.find((m) => m.id === userId);
+      if (!member) return;
+      const nextOverrides = {
+        ...teamOverrides,
+        [userId]: { ...teamOverrides[userId], status: "disabled" as const },
+      };
+      setTeamOverrides(nextOverrides);
+      saveTeamOverrides(orgKey, nextOverrides);
+
+      const message = buildUserDisabledMessage(member.name);
+      await logAudit("user_disabled", message);
+      toast(`Disabled ${member.name}`, "success");
+    },
+    [teamMembers, teamOverrides, orgKey, logAudit, toast],
+  );
+
+  const reactivateUser = useCallback(
+    async (userId: string) => {
+      const member = teamMembers.find((m) => m.id === userId);
+      if (!member) return;
+      const nextOverrides = {
+        ...teamOverrides,
+        [userId]: { ...teamOverrides[userId], status: "active" as const },
+      };
+      setTeamOverrides(nextOverrides);
+      saveTeamOverrides(orgKey, nextOverrides);
+
+      const message = buildUserReactivatedMessage(member.name);
+      await logAudit("user_reactivated", message);
+      toast(`Reactivated ${member.name}`, "success");
+    },
+    [teamMembers, teamOverrides, orgKey, logAudit, toast],
   );
 
   const value = useMemo(
@@ -238,6 +287,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       trialDaysRemaining,
       orgSettings,
       teamMembers,
+      invitations,
       usage,
       utilization,
       usageTrends,
@@ -245,6 +295,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       upgradePlan,
       inviteUser,
       updateOrgSettings,
+      changeUserRole,
+      disableUser,
+      reactivateUser,
     }),
     [
       orgKey,
@@ -253,6 +306,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       trialDaysRemaining,
       orgSettings,
       teamMembers,
+      invitations,
       usage,
       utilization,
       usageTrends,
@@ -260,6 +314,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       upgradePlan,
       inviteUser,
       updateOrgSettings,
+      changeUserRole,
+      disableUser,
+      reactivateUser,
     ],
   );
 

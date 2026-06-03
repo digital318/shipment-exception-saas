@@ -1,4 +1,4 @@
-import { CURRENT_USER } from "@/lib/constants";
+import { getCurrentActor } from "@/lib/auth/session";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { throwReadableError } from "@/lib/supabase/format-error";
 import type { ReportId } from "@/lib/reports/types";
@@ -22,8 +22,8 @@ export async function insertReportActivityEvent(
   const title = reportTitle(reportId);
   const message =
     kind === "report_generated"
-      ? `${CURRENT_USER} generated ${title}`
-      : `${CURRENT_USER} exported ${title} as ${format?.toUpperCase() ?? "file"}`;
+      ? `${getCurrentActor()} generated ${title}`
+      : `${getCurrentActor()} exported ${title} as ${format?.toUpperCase() ?? "file"}`;
 
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("activity_events").insert({
@@ -43,7 +43,7 @@ export function buildReportActivityMessage(
 ): string {
   const title = reportTitle(reportId);
   if (kind === "report_generated") {
-    return `${CURRENT_USER} generated ${title}`;
+    return `${getCurrentActor()} generated ${title}`;
   }
-  return `${CURRENT_USER} exported ${title} as ${format?.toUpperCase() ?? "file"}`;
+  return `${getCurrentActor()} exported ${title} as ${format?.toUpperCase() ?? "file"}`;
 }

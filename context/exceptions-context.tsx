@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { CURRENT_USER } from "@/lib/constants";
+import { getCurrentActor } from "@/lib/auth/session";
 import { useOrganization } from "@/context/organization-context";
 import { useToast } from "@/context/toast-context";
 import { fetchAppData, type AppDataSnapshot } from "@/lib/data";
@@ -191,7 +191,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       setActivity((act) => [
         {
           time: formatNowLabel(),
-          actor: CURRENT_USER,
+          actor: getCurrentActor(),
           event: message,
           shipmentId: null,
           type,
@@ -206,7 +206,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
     setActivity((act) => [
       {
         time: formatNowLabel(),
-        actor: CURRENT_USER,
+        actor: getCurrentActor(),
         event: message,
         shipmentId: null,
         type,
@@ -373,7 +373,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       setActivity((act) => [
         {
           time: formatNowLabel(),
-          actor: CURRENT_USER,
+          actor: getCurrentActor(),
           event: `Opened investigation on ${input.shipmentId} — ${input.title.trim()}`,
           shipmentId: input.shipmentId,
           type: "action",
@@ -416,7 +416,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
         existing && existing.status !== "Resolved" && patch.status === "Resolved"
           ? {
               time: formatNowLabel(),
-              actor: CURRENT_USER,
+              actor: getCurrentActor(),
               event: `Resolved exception on ${existing.shipmentId} — ${existing.title}`,
               shipmentId: existing.shipmentId,
               type: "resolved",
@@ -442,7 +442,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
           setActivity((act) => [
             {
               time: formatNowLabel(),
-              actor: CURRENT_USER,
+              actor: getCurrentActor(),
               event: `Status changed to ${patch.status} on ${existing.shipmentId} — ${existing.title}`,
               shipmentId: existing.shipmentId,
               type: "update",
@@ -477,7 +477,7 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
   );
 
   const addNote = useCallback(
-    async (id: string, body: string, author = CURRENT_USER) => {
+    async (id: string, body: string, author = getCurrentActor()) => {
       const trimmed = body.trim();
       if (!trimmed) return;
 
@@ -618,8 +618,8 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       setActivity((act) => [
         {
           time: formatNowLabel(),
-          actor: CURRENT_USER,
-          event: `${CURRENT_USER} completed follow-up on ${exc.shipmentId} — next check scheduled`,
+          actor: getCurrentActor(),
+          event: `${getCurrentActor()} completed follow-up on ${exc.shipmentId} — next check scheduled`,
           shipmentId: exc.shipmentId,
           type: "update",
         },
@@ -677,8 +677,8 @@ export function ExceptionsProvider({ children }: { children: ReactNode }) {
       setActivity((act) => [
         {
           time: formatNowLabel(),
-          actor: CURRENT_USER,
-          event: `${CURRENT_USER} escalated exception on ${exc.shipmentId} to ${formatEscalationLevel(nextLevel)}`,
+          actor: getCurrentActor(),
+          event: `${getCurrentActor()} escalated exception on ${exc.shipmentId} to ${formatEscalationLevel(nextLevel)}`,
           shipmentId: exc.shipmentId,
           type: "escalation",
         },

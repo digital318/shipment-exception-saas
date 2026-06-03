@@ -21,6 +21,14 @@ export const SEVERITIES: Severity[] = ["Critical", "High", "Medium", "Low"];
 
 export const SHIPMENT_ID_PATTERN = /^FP-\d{4}-\d{6}$/;
 
+import { getCurrentActor } from "@/lib/auth/session";
+
+/** @deprecated Prefer getCurrentActor() from lib/auth/session */
+export function getCurrentUser(): string {
+  return getCurrentActor();
+}
+
+/** @deprecated Use getCurrentActor() — kept for gradual migration */
 export const CURRENT_USER = "Sarah Chen";
 
 /** Default owner assigned to auto-detected exceptions. */

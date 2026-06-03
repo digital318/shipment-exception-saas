@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { CustomerRiskSection } from "@/components/executive/customer-risk-section";
 import { EscalationAgingTable } from "@/components/executive/escalation-aging-table";
+import { UserActivitySummary } from "@/components/executive/user-activity-summary";
 import {
   EscalationsByLevelChart,
   ExceptionsBySeverityChart,
@@ -83,6 +84,8 @@ export function ExecutivePage() {
         </div>
       ) : (
         <div className="space-y-8">
+          <UserActivitySummary />
+
           <div className="grid gap-4 lg:grid-cols-3">
             <FollowUpComplianceCard
               compliancePercent={followUpCompliancePercent}
