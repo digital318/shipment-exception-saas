@@ -28,8 +28,11 @@ export function PricingPage() {
             <Link href="/login" className={btnSecondary}>
               Sign in
             </Link>
+            <Link href="/#demo-request" className={btnSecondary}>
+              Request Demo
+            </Link>
             <Link href="/signup" className={btnPrimary}>
-              Start free trial
+              Get Started
             </Link>
           </div>
         </div>
@@ -75,14 +78,19 @@ export function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/signup"
-                className={`mt-8 block w-full text-center ${
-                  plan.highlighted ? btnPrimary : btnSecondary
-                }`}
-              >
-                Start 14-day free trial
-              </Link>
+              <div className="mt-8 flex flex-col gap-2">
+                <Link
+                  href="/signup"
+                  className={`block w-full text-center ${
+                    plan.highlighted ? btnPrimary : btnSecondary
+                  }`}
+                >
+                  Get Started
+                </Link>
+                <Link href="/#demo-request" className={`block w-full text-center ${btnSecondary}`}>
+                  Request Demo
+                </Link>
+              </div>
             </div>
           ))}
         </div>
@@ -103,9 +111,14 @@ export function PricingPage() {
           <p className="text-sm text-zinc-500">
             All plans include a 14-day free trial. No credit card required for demo.
           </p>
-          <Link href="/signup" className={`mt-6 inline-flex ${btnPrimary}`}>
-            Get started
-          </Link>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/signup" className={btnPrimary}>
+              Get Started
+            </Link>
+            <Link href="/#demo-request" className={btnSecondary}>
+              Request Demo
+            </Link>
+          </div>
         </section>
       </main>
     </div>

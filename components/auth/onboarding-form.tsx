@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { DASHBOARD_HOME } from "@/lib/auth/routes";
 import { useOrganization } from "@/context/organization-context";
 import { btnPrimary, inputBase } from "@/lib/styles";
 
@@ -26,7 +27,7 @@ export function OnboardingForm() {
         opsEmail,
         timezone,
       });
-      router.push("/");
+      router.push(DASHBOARD_HOME);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create organization.");

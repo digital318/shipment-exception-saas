@@ -164,3 +164,24 @@ export type DbCustomerNotificationWithRelations = DbCustomerNotification & {
   shipment: Pick<DbShipment, "id" | "shipment_number"> | null;
   exception: Pick<DbException, "id" | "title"> | null;
 };
+
+export type DbDemoRequest = {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  phone: string | null;
+  monthly_volume: string;
+  message: string | null;
+  status: "New" | "Contacted" | "Qualified" | "Closed";
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbDemoRequestActivity = {
+  id: string;
+  demo_request_id: string;
+  event_type: string;
+  message: string;
+  created_at: string;
+};

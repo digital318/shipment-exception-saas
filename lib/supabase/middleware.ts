@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAuthRoute, isOnboardingRoute, isPublicPath } from "@/lib/auth/routes";
+import {
+  DASHBOARD_HOME,
+  isAuthRoute,
+  isOnboardingRoute,
+  isPublicPath,
+} from "@/lib/auth/routes";
 import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/supabase/env";
 
 export async function updateSession(request: NextRequest) {
@@ -47,7 +52,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute(pathname)) {
     const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = "/";
+    homeUrl.pathname = DASHBOARD_HOME;
     homeUrl.search = "";
     return NextResponse.redirect(homeUrl);
   }
@@ -70,7 +75,7 @@ export async function updateSession(request: NextRequest) {
       }
     } else if (isOnboardingRoute(pathname)) {
       const homeUrl = request.nextUrl.clone();
-      homeUrl.pathname = "/";
+      homeUrl.pathname = DASHBOARD_HOME;
       homeUrl.search = "";
       return NextResponse.redirect(homeUrl);
     }

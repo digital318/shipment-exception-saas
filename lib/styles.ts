@@ -90,6 +90,8 @@ export const activityTypeStyles: Record<string, string> = {
   role_changed: `${badgeBase} bg-indigo-500/10 text-indigo-400 ring-indigo-500/20`,
   user_disabled: `${badgeBase} bg-rose-500/10 text-rose-400 ring-rose-500/20`,
   user_reactivated: `${badgeBase} bg-emerald-500/10 text-emerald-400 ring-emerald-500/20`,
+  demo_request_submitted: `${badgeBase} bg-indigo-500/10 text-indigo-400 ring-indigo-500/20`,
+  demo_request_status_changed: `${badgeBase} bg-violet-500/10 text-violet-400 ring-violet-500/20`,
 };
 
 export const agingHealthStyles = {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { DASHBOARD_HOME } from "@/lib/auth/routes";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { btnPrimary, inputBase } from "@/lib/styles";
@@ -10,7 +11,7 @@ import { btnPrimary, inputBase } from "@/lib/styles";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/";
+  const nextPath = searchParams.get("next") ?? DASHBOARD_HOME;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +42,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push(nextPath.startsWith("/") ? nextPath : "/");
+    router.push(nextPath.startsWith("/") ? nextPath : DASHBOARD_HOME);
     router.refresh();
   }
 

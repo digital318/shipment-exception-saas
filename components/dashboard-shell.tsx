@@ -90,7 +90,7 @@ export function DashboardShell({
         <aside className="hidden w-[272px] shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/90 backdrop-blur-xl lg:flex">
           <div className="flex h-[4.25rem] items-center gap-3 border-b border-white/[0.06] px-5">
             <Link
-              href="/"
+              href="/dashboard"
               className="flex items-center gap-3 transition-opacity hover:opacity-90"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/25 ring-1 ring-white/10">
@@ -112,8 +112,8 @@ export function DashboardShell({
             <ul className="space-y-0.5">
               {navItems.map((item) => {
                 const active =
-                  item.href === "/"
-                    ? pathname === "/"
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
                     : pathname.startsWith(item.href);
                 return (
                   <li key={item.href}>
@@ -194,8 +194,8 @@ export function DashboardShell({
             <div className="flex items-center gap-2 overflow-x-auto border-b border-white/[0.06] px-4 py-3 lg:hidden">
               {navItems.map((item) => {
                 const active =
-                  item.href === "/"
-                    ? pathname === "/"
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
                     : pathname.startsWith(item.href);
                 return (
                   <Link

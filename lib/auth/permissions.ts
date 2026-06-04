@@ -75,15 +75,16 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   "Customer User": ["portal", "customer_notifications"],
 };
 
-/** Admin-only routes (Phase 8C). */
+/** Admin-only routes (Phase 8C + 8D). */
 export const ADMIN_ONLY_PATHS = [
   "/organization-settings",
   "/users",
   "/billing",
+  "/demo-requests",
 ] as const;
 
 const PATH_PERMISSION: Record<string, Permission> = {
-  "/": "dashboard",
+  "/dashboard": "dashboard",
   "/shipments": "shipments",
   "/exceptions": "exceptions",
   "/notifications": "notifications",
@@ -103,11 +104,9 @@ const PATH_PERMISSION: Record<string, Permission> = {
 };
 
 export function getPermissionForPath(pathname: string): Permission | null {
-  if (pathname === "/") return "dashboard";
   const match = Object.entries(PATH_PERMISSION)
-    .filter(([path]) => path !== "/")
     .sort((a, b) => b[0].length - a[0].length)
-    .find(([path]) => pathname.startsWith(path));
+    .find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
   return match ? match[1] : null;
 }
 
@@ -139,7 +138,7 @@ export function getDefaultPathForRole(role: UserRole): string {
   if (role === "Customer User") return "/portal";
   if (role === "Customer Success") return "/customers";
   if (role === "Operations Manager") return "/shipments";
-  return "/";
+  return "/dashboard";
 }
 
 export type NavItemDef = {
@@ -149,7 +148,8 @@ export type NavItemDef = {
 };
 
 export const NAV_ITEM_DEFS: NavItemDef[] = [
-  { label: "Dashboard", href: "/", permission: "dashboard" },
+  { label: "Dashboard", href: "/dashboard", permission: "dashboard" },
+  { label: "Demo Requests", href: "/demo-requests", permission: "billing" },
   { label: "Shipments", href: "/shipments", permission: "shipments" },
   { label: "Exceptions", href: "/exceptions", permission: "exceptions" },
   { label: "Notifications", href: "/notifications", permission: "notifications" },
