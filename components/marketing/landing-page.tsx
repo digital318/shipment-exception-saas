@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { DemoRequestForm } from "@/components/marketing/demo-request-form";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
@@ -43,6 +44,16 @@ export function LandingPage() {
             <Link href="/pricing" className={btnSecondary}>
               View Pricing
             </Link>
+          </div>
+          <div className="mt-12 relative rounded-xl border border-white/10 overflow-hidden shadow-2xl max-w-5xl mx-auto hidden sm:block">
+            <Image
+              src="/dashboard-preview.png"
+              alt="FreightPulse Exception Operations Center dashboard"
+              width={1200}
+              height={700}
+              priority={true}
+            />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0a0a1a] to-transparent" />
           </div>
         </section>
 
