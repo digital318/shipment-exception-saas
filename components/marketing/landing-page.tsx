@@ -59,15 +59,15 @@ export function LandingPage() {
 
         <section className="border-y border-white/[0.06] py-8 bg-zinc-900/20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <p className="text-center text-xs uppercase tracking-widest text-zinc-600 mb-6">
+            <p className="text-center text-xs uppercase tracking-widest text-zinc-400 mb-6">
               Trusted by freight operations teams
             </p>
             <div className="flex items-center justify-center gap-10 flex-wrap">
-              <span className="text-zinc-500 text-sm font-medium tracking-wide">3PL Partners</span>
-              <span className="text-zinc-500 text-sm font-medium tracking-wide">Freight Brokers</span>
-              <span className="text-zinc-500 text-sm font-medium tracking-wide">Import Groups</span>
-              <span className="text-zinc-500 text-sm font-medium tracking-wide">Distributors</span>
-              <span className="text-zinc-500 text-sm font-medium tracking-wide">E-commerce Ops</span>
+              <span className="text-zinc-300 text-sm font-medium tracking-wide">3PL Partners</span>
+              <span className="text-zinc-300 text-sm font-medium tracking-wide">Freight Brokers</span>
+              <span className="text-zinc-300 text-sm font-medium tracking-wide">Import Groups</span>
+              <span className="text-zinc-300 text-sm font-medium tracking-wide">Distributors</span>
+              <span className="text-zinc-300 text-sm font-medium tracking-wide">E-commerce Ops</span>
             </div>
           </div>
         </section>
@@ -118,7 +118,7 @@ export function LandingPage() {
               <p className="mt-2 text-sm font-medium text-zinc-300">
                 Faster exception response
               </p>
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-zinc-400">
                 vs. manual email workflows
               </p>
             </div>
@@ -127,7 +127,7 @@ export function LandingPage() {
               <p className="mt-2 text-sm font-medium text-zinc-300">
                 More SLA compliance
               </p>
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-zinc-400">
                 with automated escalations
               </p>
             </div>
@@ -136,7 +136,7 @@ export function LandingPage() {
               <p className="mt-2 text-sm font-medium text-zinc-300">
                 Reduction in missed alerts
               </p>
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-zinc-400">
                 via real-time playbooks
               </p>
             </div>
