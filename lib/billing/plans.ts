@@ -5,9 +5,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: "starter",
     name: "Starter",
     price: 299,
-    shipmentLimit: 500,
+    shipmentLimit: 1500,
     features: [
-      "Up to 500 shipments/month",
+      "Up to 1,500 shipments/month",
       "Basic exception tracking",
       "Customer portal",
       "Reporting",
@@ -52,7 +52,7 @@ export const PLAN_COMPARISON_FEATURES: {
   professional: boolean | string;
   enterprise: boolean | string;
 }[] = [
-  { label: "Shipments/month", starter: "500", professional: "5,000", enterprise: "Unlimited" },
+  { label: "Shipments/month", starter: "1,500", professional: "5,000", enterprise: "Unlimited" },
   { label: "Exception tracking", starter: true, professional: true, enterprise: true },
   { label: "Customer portal", starter: true, professional: true, enterprise: true },
   { label: "Reporting", starter: true, professional: true, enterprise: true },

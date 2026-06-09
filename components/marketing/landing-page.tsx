@@ -185,10 +185,15 @@ export function LandingPage() {
             {SUBSCRIPTION_PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`${cardSurface} flex flex-col p-6 ${
+                className={`${cardSurface} relative flex flex-col p-6 ${
                   plan.highlighted ? "ring-1 ring-violet-500/30 bg-violet-500/[0.04]" : ""
                 }`}
               >
+                {plan.highlighted && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-violet-600 px-3 py-1 text-xs font-medium text-white">
+                    Most Popular
+                  </span>
+                )}
                 <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
                 <p className="mt-3 text-3xl font-semibold tabular-nums text-white">
                   ${plan.price}
