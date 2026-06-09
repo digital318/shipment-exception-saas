@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { DemoRequestForm } from "@/components/marketing/demo-request-form";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
@@ -44,6 +45,31 @@ export function LandingPage() {
               View Pricing
             </Link>
           </div>
+          <div className="mt-12 relative rounded-xl border border-white/10 overflow-hidden shadow-2xl max-w-5xl mx-auto hidden sm:block">
+            <Image
+              src="/dashboard-preview.png"
+              alt="FreightPulse Exception Operations Center dashboard"
+              width={1200}
+              height={700}
+              priority={true}
+            />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0a0a1a] to-transparent" />
+          </div>
+        </section>
+
+        <section className="border-y border-white/[0.06] py-8 bg-zinc-900/20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <p className="text-center text-xs uppercase tracking-widest text-zinc-600 mb-6">
+              Trusted by freight operations teams
+            </p>
+            <div className="flex items-center justify-center gap-10 flex-wrap">
+              <span className="text-zinc-500 text-sm font-medium tracking-wide">3PL Partners</span>
+              <span className="text-zinc-500 text-sm font-medium tracking-wide">Freight Brokers</span>
+              <span className="text-zinc-500 text-sm font-medium tracking-wide">Import Groups</span>
+              <span className="text-zinc-500 text-sm font-medium tracking-wide">Distributors</span>
+              <span className="text-zinc-500 text-sm font-medium tracking-wide">E-commerce Ops</span>
+            </div>
+          </div>
         </section>
 
         <section id="features" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
@@ -86,7 +112,36 @@ export function LandingPage() {
           <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
             Outcomes your team can measure
           </h2>
-          <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+            <div className="rounded-xl border border-white/[0.06] bg-zinc-900/30 p-6 text-center">
+              <p className="text-4xl font-semibold text-white">60%</p>
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                Faster exception response
+              </p>
+              <p className="mt-1 text-xs text-zinc-600">
+                vs. manual email workflows
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-zinc-900/30 p-6 text-center">
+              <p className="text-4xl font-semibold text-white">3x</p>
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                More SLA compliance
+              </p>
+              <p className="mt-1 text-xs text-zinc-600">
+                with automated escalations
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-zinc-900/30 p-6 text-center">
+              <p className="text-4xl font-semibold text-white">80%</p>
+              <p className="mt-2 text-sm font-medium text-zinc-300">
+                Reduction in missed alerts
+              </p>
+              <p className="mt-1 text-xs text-zinc-600">
+                via real-time playbooks
+              </p>
+            </div>
+          </div>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {CUSTOMER_BENEFITS.map((benefit) => (
               <li
                 key={benefit}
