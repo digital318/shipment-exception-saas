@@ -89,6 +89,21 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+          <p className="text-center text-xs uppercase tracking-widest text-zinc-400 mb-8">
+            Built for your carrier network
+          </p>
+          <div className="flex items-center justify-center gap-x-10 gap-y-4 flex-wrap">
+            <span className="text-zinc-300 text-base font-semibold tracking-tight">FedEx Freight</span>
+            <span className="text-zinc-300 text-base font-semibold tracking-tight">XPO Logistics</span>
+            <span className="text-zinc-300 text-base font-semibold tracking-tight">Old Dominion</span>
+            <span className="text-zinc-300 text-base font-semibold tracking-tight">Schneider</span>
+            <span className="text-zinc-300 text-base font-semibold tracking-tight">JB Hunt</span>
+            <span className="text-zinc-300 text-base font-semibold tracking-tight">Werner</span>
+            <span className="text-zinc-500 text-sm">+ more</span>
+          </div>
+        </section>
+
         <section id="how-it-works" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
           <p className={sectionLabel}>How it works</p>
           <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
