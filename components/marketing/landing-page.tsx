@@ -125,34 +125,37 @@ export function LandingPage() {
         <section id="benefits" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
           <p className={sectionLabel}>Customer benefits</p>
           <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
-            Outcomes your team can measure
+          Built to move the numbers that matter
+
+
           </h2>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
             <div className="rounded-xl border border-white/[0.06] bg-zinc-900/30 p-6 text-center">
-              <p className="text-4xl font-semibold text-white">60%</p>
+              <p className="text-4xl font-semibold text-white">Catch it first</p>
               <p className="mt-2 text-sm font-medium text-zinc-300">
-                Faster exception response
+              Flag drifting shipments early
               </p>
               <p className="mt-1 text-xs text-zinc-400">
-                vs. manual email workflows
+              before the customer calls, not after
               </p>
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-zinc-900/30 p-6 text-center">
-              <p className="text-4xl font-semibold text-white">3x</p>
+              <p className="text-4xl font-semibold text-white">Protect your SLAs</p>
               <p className="mt-2 text-sm font-medium text-zinc-300">
-                More SLA compliance
+              Every at-risk load surfaced
+
               </p>
               <p className="mt-1 text-xs text-zinc-400">
-                with automated escalations
+              with time to act, not explain
               </p>
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-zinc-900/30 p-6 text-center">
-              <p className="text-4xl font-semibold text-white">80%</p>
+              <p className="text-4xl font-semibold text-white">Nothing slips through</p>
               <p className="mt-2 text-sm font-medium text-zinc-300">
-                Reduction in missed alerts
+              One exception queue
               </p>
               <p className="mt-1 text-xs text-zinc-400">
-                via real-time playbooks
+              instead of scattered emails and check-ins 
               </p>
             </div>
           </div>
