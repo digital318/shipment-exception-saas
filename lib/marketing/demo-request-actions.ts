@@ -47,9 +47,12 @@ export async function submitDemoRequest(
 
   const supabase = await createSupabaseServerClient();
 
-  const { data: row, error } = await supabase
+  const id = crypto.randomUUID();
+
+  const { error } = await supabase
     .from("demo_requests")
     .insert({
+      id,
       name: validated.name,
       company: validated.company,
       email: validated.email,
@@ -57,22 +60,20 @@ export async function submitDemoRequest(
       monthly_volume: validated.monthlyVolume,
       message: validated.message || null,
       status: "New",
-    })
-    .select("id")
-    .single();
+    });
 
   if (error) throw new Error(error.message);
 
   const activityMessage = `Demo request submitted by ${validated.name} (${validated.company})`;
   const { error: activityError } = await supabase.from("demo_request_activity").insert({
-    demo_request_id: row.id,
+    demo_request_id: id,
     event_type: DEMO_SUBMITTED_EVENT,
     message: activityMessage,
   });
 
   if (activityError) throw new Error(activityError.message);
 
-  return { ok: true, id: row.id };
+  return { ok: true, id };
 }
 
 export async function fetchDemoRequests(): Promise<DemoRequest[]> {
