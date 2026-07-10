@@ -57,6 +57,28 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section id="demo-video" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+          <p className={sectionLabel}>Product demo</p>
+          <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
+            See it in under 4 minutes
+          </h2>
+          <p className="mt-3 max-w-xl text-sm text-zinc-500">
+            A walkthrough of the exception command center, live shipment tracking, and
+            how issues get caught before customers call.
+          </p>
+          <div
+            className="relative mt-8 w-full max-w-4xl overflow-hidden rounded-xl border border-white/10 shadow-2xl"
+            style={{ paddingBottom: "56.25%", height: 0 }}
+          >
+            <iframe
+              src="https://www.loom.com/embed/6cdf68595ce64e14bd8e6c42ebfe24bb"
+              frameBorder="0"
+              allowFullScreen
+              className="absolute left-0 top-0 h-full w-full"
+            />
+          </div>
+        </section>
+
         <section className="border-y border-white/[0.06] py-8 bg-zinc-900/20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <p className="text-center text-xs uppercase tracking-widest text-zinc-400 mb-6">
